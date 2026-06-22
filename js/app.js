@@ -1,5 +1,8 @@
 let currentTopic = null;
 let currentTopicMode = null;
+let currentSessionLength = "standard";
+let currentQuizType = "topic";
+let currentMistakeFilter = "all";
 let quizQuestions = [];
 let currentIndex = 0;
 let score = 0;
@@ -50,16 +53,29 @@ const topicFilters = document.getElementById("topic-filters");
 const knowledgeContent = document.getElementById("knowledge-content");
 const mainEl = document.querySelector(".main");
 const btnBrand = document.getElementById("btn-brand");
-const modePicker = document.getElementById("mode-picker");
-const modePickerBackdrop = document.getElementById("mode-picker-backdrop");
-const modePickerClose = document.getElementById("mode-picker-close");
-const modePickerHeader = document.getElementById("mode-picker-header");
-const modePickerOptions = document.getElementById("mode-picker-options");
+const mistakesBanner = document.getElementById("mistakes-banner");
+const quizSetup = document.getElementById("quiz-setup");
+const quizSetupBackdrop = document.getElementById("quiz-setup-backdrop");
+const quizSetupClose = document.getElementById("quiz-setup-close");
+const quizSetupHeader = document.getElementById("quiz-setup-header");
+const quizSetupSub = document.getElementById("quiz-setup-sub");
+const setupFormatSection = document.getElementById("setup-format-section");
+const setupFormatOptions = document.getElementById("setup-format-options");
+const setupFilterSection = document.getElementById("setup-filter-section");
+const setupFilterOptions = document.getElementById("setup-filter-options");
+const setupLengthOptions = document.getElementById("setup-length-options");
+const setupStart = document.getElementById("setup-start");
+const btnReviewMistakes = document.getElementById("btn-review-mistakes");
 
 let knowledgeFilter = "all";
+let pendingSetup = null;
 
 const RING_CIRCUMFERENCE = 327;
-const QUESTIONS_PER_SESSION = 15;
+const SESSION_LENGTHS = [
+    { id: "quick", label: "Быстрый", count: 5, icon: "⚡", description: "5 вопросов" },
+    { id: "standard", label: "Стандарт", count: 15, icon: "📋", description: "15 вопросов" },
+    { id: "marathon", label: "Марафон", count: null, icon: "🏁", description: "Все из пула" }
+];
 
 function shuffle(array) {
     const arr = [...array];
@@ -78,8 +94,10 @@ function getQuestionCount(topicName, mode = null) {
     }).length;
 }
 
-function getSessionSize(poolSize) {
-    return Math.min(QUESTIONS_PER_SESSION, poolSize);
+function getSessionSize(poolSize, lengthId = "standard") {
+    const cfg = SESSION_LENGTHS.find((l) => l.id === lengthId);
+    if (!cfg || cfg.count === null) return poolSize;
+    return Math.min(cfg.count, poolSize);
 }
 
 function getModeLabel(topicName, modeId) {
@@ -88,8 +106,52 @@ function getModeLabel(topicName, modeId) {
     return mode ? mode.label : modeId;
 }
 
-function topicHasModes(topicName) {
-    return Boolean(getTopicConfig(topicName).modes?.length);
+function getTopicCountText(topicName) {
+    const cfg = getTopicConfig(topicName);
+    if (cfg.modes?.length) {
+        return cfg.modes
+            .map((m) => `${getQuestionCount(topicName, m.id)} ${m.label.toLowerCase()}`)
+            .join(" · ");
+    }
+    return `${getQuestionCount(topicName)} в базе`;
+}
+
+function renderMistakesBanner() {
+    const count = getMistakeCount();
+    if (count === 0) {
+        mistakesBanner.classList.add("hidden");
+        mistakesBanner.innerHTML = "";
+        return;
+    }
+
+    mistakesBanner.classList.remove("hidden");
+    mistakesBanner.innerHTML = `
+        <div class="mistakes-banner-body">
+            <h3>🔄 Работа над ошибками</h3>
+            <p>${count} ${pluralQuestions(count)} на повторение — ответили верно, и вопрос уберётся из списка</p>
+        </div>
+        <div class="mistakes-banner-actions">
+            <button type="button" class="btn btn-primary" id="btn-start-mistakes">Повторить</button>
+            <button type="button" class="btn-text" id="btn-clear-mistakes">Очистить</button>
+        </div>
+    `;
+
+    document.getElementById("btn-start-mistakes").addEventListener("click", openQuizSetupForMistakes);
+    document.getElementById("btn-clear-mistakes").addEventListener("click", () => {
+        if (confirm(`Удалить все ${count} вопросов из банка ошибок?`)) {
+            clearAllMistakes();
+            renderMistakesBanner();
+            renderTopics();
+        }
+    });
+}
+
+function pluralQuestions(n) {
+    const mod10 = n % 10;
+    const mod100 = n % 100;
+    if (mod10 === 1 && mod100 !== 11) return "вопрос";
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return "вопроса";
+    return "вопросов";
 }
 
 function scoreClass(percent) {
@@ -127,9 +189,7 @@ function renderTopics() {
         .map((topic) => {
             const cfg = getTopicConfig(topic.name);
             const hasModes = Boolean(cfg.modes?.length);
-            const countText = hasModes
-                ? `${getQuestionCount(topic.name, "определение")} опр. · ${getQuestionCount(topic.name, "кейс")} кейсов`
-                : `${getQuestionCount(topic.name)} в базе · ${getSessionSize(getQuestionCount(topic.name))} за раунд`;
+            const countText = getTopicCountText(topic.name);
             const miniStat =
                 topic.count > 0
                     ? `Ср. ${topic.avg}% · ${topic.count} раз`
@@ -153,50 +213,184 @@ function renderTopics() {
         .join("");
 
     topicsGrid.querySelectorAll(".topic-card").forEach((card) => {
-        card.addEventListener("click", () => {
-            const topic = card.dataset.topic;
-            if (topicHasModes(topic)) openModePicker(topic);
-            else startQuiz(topic);
-        });
+        card.addEventListener("click", () => openQuizSetupForTopic(card.dataset.topic));
     });
+
+    renderMistakesBanner();
 }
 
-function openModePicker(topic) {
+function openQuizSetupForTopic(topic) {
     const cfg = getTopicConfig(topic);
-    modePickerHeader.innerHTML = `
-        <span class="topic-icon">${cfg.icon}</span>
-        <h2 id="mode-picker-title">${escapeHtml(topic)}</h2>
-    `;
-
-    modePickerOptions.innerHTML = cfg.modes
-        .map((mode) => {
-            const count = getQuestionCount(topic, mode.id);
-            const perRound = getSessionSize(count);
-            return `
-            <button type="button" class="mode-option-btn" data-mode="${escapeHtml(mode.id)}" style="--mode-color: ${cfg.color}">
-                <span class="mode-option-icon">${mode.icon}</span>
-                <div class="mode-option-body">
-                    <h3>${escapeHtml(mode.label)}</h3>
-                    <p>${escapeHtml(mode.description)}</p>
-                    <span class="mode-option-count">${count} вопросов · ${perRound} за раунд</span>
-                </div>
-            </button>
-        `;
-        })
-        .join("");
-
-    modePickerOptions.querySelectorAll(".mode-option-btn").forEach((btn) => {
-        btn.addEventListener("click", () => {
-            closeModePicker();
-            startQuiz(topic, btn.dataset.mode);
-        });
-    });
-
-    modePicker.classList.remove("hidden");
+    pendingSetup = {
+        kind: "topic",
+        topic,
+        mode: cfg.modes?.[0]?.id || null,
+        length: "standard"
+    };
+    renderQuizSetup();
 }
 
-function closeModePicker() {
-    modePicker.classList.add("hidden");
+function openQuizSetupForMistakes() {
+    pendingSetup = { kind: "mistakes", filter: "all", length: "standard" };
+    renderQuizSetup();
+}
+
+function renderQuizSetup() {
+    if (!pendingSetup) return;
+
+    const setupColor = "#EF4444";
+
+    if (pendingSetup.kind === "topic") {
+        const cfg = getTopicConfig(pendingSetup.topic);
+        quizSetupHeader.innerHTML = `
+            <span class="topic-icon">${cfg.icon}</span>
+            <h2 id="quiz-setup-title">${escapeHtml(pendingSetup.topic)}</h2>
+        `;
+        quizSetupSub.textContent = "Выберите формат и длину раунда";
+        setupFormatSection.classList.toggle("hidden", !cfg.modes?.length);
+
+        if (cfg.modes?.length) {
+            setupFormatOptions.innerHTML = cfg.modes
+                .map((mode) => {
+                    const count = getQuestionCount(pendingSetup.topic, mode.id);
+                    return `
+                    <button type="button" class="mode-option-btn${pendingSetup.mode === mode.id ? " active" : ""}" data-mode="${escapeHtml(mode.id)}" style="--mode-color: ${cfg.color}">
+                        <span class="mode-option-icon">${mode.icon}</span>
+                        <div class="mode-option-body">
+                            <h3>${escapeHtml(mode.label)}</h3>
+                            <p>${escapeHtml(mode.description)}</p>
+                            <span class="mode-option-count">${count} вопросов в базе</span>
+                        </div>
+                    </button>
+                `;
+                })
+                .join("");
+
+            setupFormatOptions.querySelectorAll(".mode-option-btn").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    pendingSetup.mode = btn.dataset.mode;
+                    renderQuizSetup();
+                });
+            });
+        }
+
+        renderLengthOptions(cfg.color);
+    } else {
+        quizSetupHeader.innerHTML = `
+            <span class="topic-icon">🔄</span>
+            <h2 id="quiz-setup-title">Работа над ошибками</h2>
+        `;
+        quizSetupSub.textContent = "Повторите вопросы, в которых ошибались";
+        setupFormatSection.classList.add("hidden");
+
+        const topics = getTopicsWithMistakes();
+        setupFilterSection.classList.remove("hidden");
+        setupFilterOptions.innerHTML = `
+            <button type="button" class="setup-chip${pendingSetup.filter === "all" ? " active" : ""}" data-filter="all" style="--chip-color: ${setupColor}">Все темы (${getMistakeCount()})</button>
+            ${topics
+                .map((topic) => {
+                    const cfg = getTopicConfig(topic);
+                    const count = getMistakeCount(topic);
+                    return `
+                <button type="button" class="setup-chip${pendingSetup.filter === topic ? " active" : ""}" data-filter="${escapeHtml(topic)}" style="--chip-color: ${cfg.color}">
+                    ${cfg.icon} ${escapeHtml(topic)} (${count})
+                </button>
+            `;
+                })
+                .join("")}
+        `;
+
+        setupFilterOptions.querySelectorAll(".setup-chip").forEach((chip) => {
+            chip.addEventListener("click", () => {
+                pendingSetup.filter = chip.dataset.filter;
+                renderQuizSetup();
+            });
+        });
+
+        renderLengthOptions(setupColor);
+    }
+
+    setupFilterSection.classList.toggle("hidden", pendingSetup.kind !== "mistakes");
+    setupStart.disabled = getSetupPool().length === 0;
+    setupStart.textContent =
+        getSetupPool().length === 0 ? "Нет вопросов" : `Начать · ${getSetupSessionSize()} вопросов`;
+
+    quizSetup.classList.remove("hidden");
+}
+
+function renderLengthOptions(color) {
+    const poolSize = getSetupPool().length;
+    setupLengthOptions.innerHTML = SESSION_LENGTHS.map((len) => {
+        const size = getSessionSize(poolSize, len.id);
+        return `
+        <button type="button" class="setup-length-btn${pendingSetup.length === len.id ? " active" : ""}" data-length="${len.id}" style="--setup-color: ${color}">
+            <strong>${len.icon} ${len.label}</strong>
+            <span>${len.id === "marathon" ? `Все ${size}` : len.description}</span>
+        </button>
+    `;
+    }).join("");
+
+    setupLengthOptions.querySelectorAll(".setup-length-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            pendingSetup.length = btn.dataset.length;
+            renderQuizSetup();
+        });
+    });
+}
+
+function getSetupPool() {
+    if (!pendingSetup) return [];
+
+    if (pendingSetup.kind === "mistakes") {
+        return getMistakeQuestions(pendingSetup.filter);
+    }
+
+    let pool = QUESTIONS.filter((q) => q.topic === pendingSetup.topic);
+    const cfg = getTopicConfig(pendingSetup.topic);
+    if (cfg.modes?.length) {
+        if (!pendingSetup.mode) return [];
+        pool = pool.filter((q) => q.mode === pendingSetup.mode);
+    }
+    return pool;
+}
+
+function getSetupSessionSize() {
+    return getSessionSize(getSetupPool().length, pendingSetup?.length || "standard");
+}
+
+function closeQuizSetup() {
+    quizSetup.classList.add("hidden");
+    pendingSetup = null;
+}
+
+function startQuizFromSetup() {
+    if (!pendingSetup) return;
+
+    const pool = getSetupPool();
+    if (pool.length === 0) return;
+
+    if (pendingSetup.kind === "topic") {
+        const cfg = getTopicConfig(pendingSetup.topic);
+        if (cfg.modes?.length && !pendingSetup.mode) return;
+        launchQuiz({
+            pool,
+            topic: pendingSetup.topic,
+            mode: pendingSetup.mode,
+            length: pendingSetup.length,
+            quizType: "topic"
+        });
+    } else {
+        launchQuiz({
+            pool,
+            topic: pendingSetup.filter === "all" ? "Все темы" : pendingSetup.filter,
+            mode: null,
+            length: pendingSetup.length,
+            quizType: "mistakes",
+            mistakeFilter: pendingSetup.filter
+        });
+    }
+
+    closeQuizSetup();
 }
 
 function renderStatsView() {
@@ -415,7 +609,7 @@ function setNavVisible(visible) {
 }
 
 function showMainView(view) {
-    closeModePicker();
+    closeQuizSetup();
     trainView.classList.add("hidden");
     statsView.classList.add("hidden");
     knowledgeView.classList.add("hidden");
@@ -428,6 +622,7 @@ function showMainView(view) {
     });
 
     if (view === "train") {
+        pruneStaleMistakes();
         trainView.classList.remove("hidden");
         renderOverviewStrip();
         renderTopics();
@@ -440,19 +635,14 @@ function showMainView(view) {
     }
 }
 
-function startQuiz(topic, mode = null) {
+function launchQuiz({ pool, topic, mode, length, quizType, mistakeFilter = "all" }) {
     currentTopic = topic;
     currentTopicMode = mode;
+    currentSessionLength = length;
+    currentQuizType = quizType;
+    currentMistakeFilter = mistakeFilter;
 
-    let pool = QUESTIONS.filter((q) => q.topic === topic);
-    if (mode) pool = pool.filter((q) => q.mode === mode);
-
-    if (pool.length === 0) {
-        alert("В этом формате пока нет вопросов.");
-        return;
-    }
-
-    quizQuestions = shuffle(pool).slice(0, getSessionSize(pool.length));
+    quizQuestions = shuffle(pool).slice(0, getSessionSize(pool.length, length));
     currentIndex = 0;
     score = 0;
     answered = false;
@@ -464,14 +654,69 @@ function startQuiz(topic, mode = null) {
     quizScreen.classList.remove("hidden");
     setNavVisible(false);
 
-    const cfg = getTopicConfig(topic);
-    const modeLabel = mode ? getModeLabel(topic, mode) : null;
-    quizTopicBadge.textContent = modeLabel
-        ? `${cfg.icon} ${topic} · ${modeLabel}`
-        : `${cfg.icon} ${topic}`;
-    quizTopicBadge.style.borderColor = cfg.color + "44";
-
+    updateQuizBadge();
     renderQuestion();
+}
+
+function updateQuizBadge() {
+    if (currentQuizType === "mistakes") {
+        const filterLabel =
+            currentMistakeFilter === "all"
+                ? "Все темы"
+                : currentMistakeFilter;
+        const len =
+            currentSessionLength !== "standard"
+                ? ` · ${getSessionLengthLabel(currentSessionLength) || currentSessionLength}`
+                : "";
+        quizTopicBadge.textContent = `🔄 Ошибки · ${filterLabel}${len}`;
+        quizTopicBadge.style.borderColor = "#EF444444";
+        return;
+    }
+
+    const cfg = getTopicConfig(currentTopic);
+    const modeLabel = currentTopicMode ? getModeLabel(currentTopic, currentTopicMode) : null;
+    const len =
+        currentSessionLength !== "standard"
+            ? ` · ${getSessionLengthLabel(currentSessionLength) || currentSessionLength}`
+            : "";
+    quizTopicBadge.textContent = modeLabel
+        ? `${cfg.icon} ${currentTopic} · ${modeLabel}${len}`
+        : `${cfg.icon} ${currentTopic}${len}`;
+    quizTopicBadge.style.borderColor = cfg.color + "44";
+}
+
+function restartQuiz() {
+    if (currentQuizType === "mistakes") {
+        const pool = getMistakeQuestions(currentMistakeFilter);
+        if (pool.length === 0) {
+            alert("В банке ошибок больше нет вопросов.");
+            showMainView("train");
+            return;
+        }
+        launchQuiz({
+            pool,
+            topic: currentMistakeFilter === "all" ? "Все темы" : currentMistakeFilter,
+            mode: null,
+            length: currentSessionLength,
+            quizType: "mistakes",
+            mistakeFilter: currentMistakeFilter
+        });
+        return;
+    }
+
+    let pool = QUESTIONS.filter((q) => q.topic === currentTopic);
+    if (currentTopicMode) pool = pool.filter((q) => q.mode === currentTopicMode);
+    if (pool.length === 0) {
+        alert("В этом формате пока нет вопросов.");
+        return;
+    }
+    launchQuiz({
+        pool,
+        topic: currentTopic,
+        mode: currentTopicMode,
+        length: currentSessionLength,
+        quizType: "topic"
+    });
 }
 
 function renderQuestion() {
@@ -511,7 +756,12 @@ function selectAnswer(selectedIndex) {
     const q = quizQuestions[currentIndex];
     const isCorrect = selectedIndex === q.correct;
 
-    if (isCorrect) score++;
+    if (isCorrect) {
+        score++;
+        clearMistake(q.id);
+    } else {
+        recordMistake(q);
+    }
 
     optionsList.querySelectorAll(".option-btn").forEach((btn, i) => {
         btn.disabled = true;
@@ -581,22 +831,70 @@ function renderMistakesReview() {
         .join("");
 
     resultsKnowledge.classList.remove("hidden");
-    resultsKnowledgeHint.textContent = `Вы ошиблись в ${wrongAnswers.length} из ${quizQuestions.length} вопросов — рекомендуем повторить материалы по теме «${currentTopic}».`;
+    if (currentQuizType === "mistakes") {
+        resultsKnowledgeHint.textContent = `Вы ошиблись в ${wrongAnswers.length} из ${quizQuestions.length} — эти вопросы останутся в банке до правильного ответа.`;
+    } else {
+        resultsKnowledgeHint.textContent = `Вы ошиблись в ${wrongAnswers.length} из ${quizQuestions.length} вопросов — рекомендуем повторить материалы по теме «${currentTopic}».`;
+    }
+}
+
+function getResultsTitle() {
+    if (currentQuizType === "mistakes") {
+        const filterLabel =
+            currentMistakeFilter === "all"
+                ? "Все темы"
+                : currentMistakeFilter;
+        return `Работа над ошибками · ${filterLabel}`;
+    }
+
+    const modeLabel = currentTopicMode ? getModeLabel(currentTopic, currentTopicMode) : null;
+    return modeLabel ? `${currentTopic} · ${modeLabel}` : currentTopic;
+}
+
+function updateResultsMistakesButton() {
+    const count = getMistakeCount();
+    if (count > 0) {
+        btnReviewMistakes.classList.remove("hidden");
+        btnReviewMistakes.textContent = `🔄 Повторить ошибки (${count})`;
+    } else {
+        btnReviewMistakes.classList.add("hidden");
+    }
+}
+
+function openKnowledgeForCurrentQuiz() {
+    if (currentQuizType === "mistakes") {
+        openKnowledge(currentMistakeFilter === "all" ? "all" : currentMistakeFilter);
+    } else {
+        openKnowledge(currentTopic);
+    }
 }
 
 function showResults() {
     const total = quizQuestions.length;
     const percent = Math.round((score / total) * 100);
 
-    recordSession(currentTopic, score, total, currentTopicMode);
+    recordSession(
+        currentQuizType === "mistakes" ? "Ошибки" : currentTopic,
+        score,
+        total,
+        currentTopicMode,
+        { sessionLength: currentSessionLength, quizType: currentQuizType }
+    );
 
-    const modeLabel = currentTopicMode ? getModeLabel(currentTopic, currentTopicMode) : null;
-    resultsTopic.textContent = modeLabel ? `${currentTopic} · ${modeLabel}` : currentTopic;
+    resultsTopic.textContent = getResultsTitle();
     resultsScore.textContent = `${percent}%`;
     resultsDetail.textContent = `${score} из ${total} правильных`;
 
     let recommendation;
-    if (percent >= 80) {
+    if (currentQuizType === "mistakes") {
+        if (percent === 100) {
+            recommendation = "Отлично! Все ошибки в этом раунде исправлены. Проверьте банк — возможно, остались вопросы из других тем.";
+        } else if (percent >= 50) {
+            recommendation = "Прогресс есть — повторите оставшиеся ошибки через некоторое время.";
+        } else {
+            recommendation = "Вернитесь к теории по проблемным темам, затем снова пройдите банк ошибок.";
+        }
+    } else if (percent >= 80) {
         recommendation = "Отлично! Тема усвоена хорошо. Попробуйте другой модуль или пройдите ещё раз для закрепления.";
     } else if (percent >= 50) {
         recommendation = "Есть пробелы — перечитайте объяснения к ошибкам и повторите через некоторое время.";
@@ -606,6 +904,7 @@ function showResults() {
     resultsRecommendation.textContent = recommendation;
 
     renderMistakesReview();
+    updateResultsMistakesButton();
 
     quizScreen.classList.add("hidden");
     resultsScreen.classList.remove("hidden");
@@ -641,18 +940,21 @@ btnBack.addEventListener("click", () => {
     }
     showMainView("train");
 });
-btnRestart.addEventListener("click", () => startQuiz(currentTopic, currentTopicMode));
+btnRestart.addEventListener("click", () => restartQuiz());
 btnHome.addEventListener("click", () => showMainView("train"));
-btnStudyTopic.addEventListener("click", () => openKnowledge(currentTopic));
-btnStudyAfterResults.addEventListener("click", () => openKnowledge(currentTopic));
+btnStudyTopic.addEventListener("click", () => openKnowledgeForCurrentQuiz());
+btnStudyAfterResults.addEventListener("click", () => openKnowledgeForCurrentQuiz());
+btnReviewMistakes.addEventListener("click", () => openQuizSetupForMistakes());
 btnBrand.addEventListener("click", goHome);
 
-modePickerBackdrop.addEventListener("click", closeModePicker);
-modePickerClose.addEventListener("click", closeModePicker);
+quizSetupBackdrop.addEventListener("click", closeQuizSetup);
+quizSetupClose.addEventListener("click", closeQuizSetup);
+setupStart.addEventListener("click", startQuizFromSetup);
 
 btnClearStats.addEventListener("click", () => {
-    if (confirm("Удалить всю статистику? Это действие нельзя отменить.")) {
+    if (confirm("Удалить всю статистику и банк ошибок? Это действие нельзя отменить.")) {
         clearStats();
+        clearAllMistakes();
         renderStatsView();
         renderOverviewStrip();
         renderTopics();

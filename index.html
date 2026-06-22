@@ -34,18 +34,31 @@
             <!-- Тренировка -->
             <div id="train-view">
                 <div class="overview-strip" id="overview-strip"></div>
+                <div id="mistakes-banner" class="mistakes-banner hidden"></div>
                 <h2 class="section-title">Выберите тему</h2>
                 <div class="topics-grid" id="topics-grid"></div>
             </div>
 
-            <!-- Выбор формата (Метрики) -->
-            <div id="mode-picker" class="mode-picker hidden" role="dialog" aria-modal="true" aria-labelledby="mode-picker-title">
-                <div class="mode-picker-backdrop" id="mode-picker-backdrop"></div>
-                <div class="mode-picker-card">
-                    <button type="button" class="mode-picker-close" id="mode-picker-close" aria-label="Закрыть">×</button>
-                    <div class="mode-picker-header" id="mode-picker-header"></div>
-                    <p class="mode-picker-sub">Выберите формат тренировки</p>
-                    <div class="mode-picker-options" id="mode-picker-options"></div>
+            <!-- Настройка раунда -->
+            <div id="quiz-setup" class="mode-picker hidden" role="dialog" aria-modal="true" aria-labelledby="quiz-setup-title">
+                <div class="mode-picker-backdrop" id="quiz-setup-backdrop"></div>
+                <div class="mode-picker-card mode-picker-card-wide">
+                    <button type="button" class="mode-picker-close" id="quiz-setup-close" aria-label="Закрыть">×</button>
+                    <div class="mode-picker-header" id="quiz-setup-header"></div>
+                    <p class="mode-picker-sub" id="quiz-setup-sub"></p>
+                    <div class="quiz-setup-section hidden" id="setup-format-section">
+                        <h3 class="setup-section-title">Формат</h3>
+                        <div class="mode-picker-options" id="setup-format-options"></div>
+                    </div>
+                    <div class="quiz-setup-section hidden" id="setup-filter-section">
+                        <h3 class="setup-section-title">Тема</h3>
+                        <div class="setup-chips" id="setup-filter-options"></div>
+                    </div>
+                    <div class="quiz-setup-section">
+                        <h3 class="setup-section-title">Длина раунда</h3>
+                        <div class="setup-length-grid" id="setup-length-options"></div>
+                    </div>
+                    <button type="button" class="btn btn-primary setup-start-btn" id="setup-start">Начать</button>
                 </div>
             </div>
 
@@ -139,6 +152,7 @@
                     </div>
                     <div class="results-actions">
                         <button class="btn btn-primary" id="btn-restart">Пройти снова</button>
+                        <button class="btn btn-secondary hidden" id="btn-review-mistakes">🔄 Повторить ошибки</button>
                         <button class="btn btn-secondary" id="btn-home">К темам</button>
                     </div>
                 </div>
@@ -148,9 +162,10 @@
 
     <script src="js/questions.js"></script>
     <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
     <script src="js/knowledge.js"></script>
     <script src="js/stats.js"></script>
-    <script src="js/utils.js"></script>
+    <script src="js/mistakes.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

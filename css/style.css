@@ -428,6 +428,11 @@ body::before {
     transform: translateY(-1px);
 }
 
+.mode-option-btn.active {
+    border-color: var(--mode-color, var(--primary));
+    background: color-mix(in srgb, var(--mode-color, var(--primary)) 14%, transparent);
+}
+
 .mode-option-icon {
     font-size: 1.5rem;
     flex-shrink: 0;
@@ -450,6 +455,159 @@ body::before {
     font-size: 0.75rem;
     font-weight: 600;
     color: var(--mode-color, var(--primary));
+}
+
+.mode-picker-card-wide {
+    width: min(520px, 100%);
+}
+
+.quiz-setup-section {
+    margin-bottom: 18px;
+}
+
+.quiz-setup-section.hidden {
+    display: none;
+}
+
+.setup-section-title {
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+
+.setup-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.setup-chip {
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.setup-chip:hover {
+    border-color: var(--chip-color, var(--primary));
+}
+
+.setup-chip.active {
+    border-color: var(--chip-color, var(--primary));
+    background: color-mix(in srgb, var(--chip-color, var(--primary)) 18%, transparent);
+    color: var(--text);
+    font-weight: 600;
+}
+
+.setup-length-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.setup-length-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+}
+
+.setup-length-btn:hover {
+    border-color: var(--setup-color, var(--primary));
+}
+
+.setup-length-btn.active {
+    border-color: var(--setup-color, var(--primary));
+    background: color-mix(in srgb, var(--setup-color, var(--primary)) 14%, transparent);
+}
+
+.setup-length-btn strong {
+    font-size: 0.88rem;
+}
+
+.setup-length-btn span {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    line-height: 1.3;
+}
+
+.setup-start-btn {
+    width: 100%;
+    margin-top: 4px;
+}
+
+.setup-start-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.mistakes-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 18px;
+    margin-bottom: 20px;
+    border-radius: var(--radius);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.mistakes-banner.hidden {
+    display: none;
+}
+
+.mistakes-banner-body h3 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.mistakes-banner-body p {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.mistakes-banner-actions {
+    display: flex;
+    flex-shrink: 0;
+    gap: 8px;
+    align-items: center;
+}
+
+@media (max-width: 600px) {
+    .setup-length-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .mistakes-banner {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .mistakes-banner-actions {
+        flex-direction: column;
+    }
+
+    .mistakes-banner-actions .btn {
+        width: 100%;
+    }
 }
 
 /* Stats view */

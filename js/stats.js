@@ -17,12 +17,14 @@ function saveStats(data) {
     localStorage.setItem(STATS_KEY, JSON.stringify(data));
 }
 
-function recordSession(topic, score, total, mode = null) {
+function recordSession(topic, score, total, mode = null, extras = {}) {
     const data = loadStats();
     data.sessions.push({
         id: Date.now(),
         topic,
         mode: mode || undefined,
+        sessionLength: extras.sessionLength || undefined,
+        quizType: extras.quizType || undefined,
         score,
         total,
         percent: total > 0 ? Math.round((score / total) * 100) : 0,
@@ -32,10 +34,23 @@ function recordSession(topic, score, total, mode = null) {
 }
 
 function getSessionTopicLabel(session) {
-    if (!session.mode) return session.topic;
+    if (session.quizType === "mistakes") {
+        const base = "Работа над ошибками";
+        const len = getSessionLengthLabel(session.sessionLength);
+        return len ? `${base} · ${len}` : base;
+    }
+
+    let label = session.topic;
     const cfg = getTopicConfig(session.topic);
     const mode = cfg.modes?.find((m) => m.id === session.mode);
-    return mode ? `${session.topic} · ${mode.label}` : session.topic;
+    if (mode) label = `${label} · ${mode.label}`;
+
+    const len = getSessionLengthLabel(session.sessionLength);
+    if (len && session.sessionLength !== "standard") {
+        label = `${label} · ${len}`;
+    }
+
+    return label;
 }
 
 function toDateKey(iso) {

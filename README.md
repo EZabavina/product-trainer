@@ -1,18 +1,23 @@
 # Тренажёр Продакта
 
-Веб-тренажёр для продакт-менеджеров: **265 вопросов** по 5 темам, база знаний, статистика в localStorage.
+Веб-тренажёр для продакт-менеджеров: **265 вопросов** по 5 темам, база знаний, статистика и банк ошибок в `localStorage`.
 
 ## Темы
 
 | Тема | Вопросов |
 |------|----------|
-| Метрики | 50 |
+| Метрики | 65 (определения + кейсы) |
 | Финансовая модель | 50 |
 | Юнит-экономика | 50 |
 | JTBD | 50 |
 | CustDev | 50 |
 
-За один раунд — **15 случайных вопросов** из выбранной темы.
+## Возможности
+
+- **Длина раунда** при старте: быстрый (5), стандарт (15) или марафон (все из пула)
+- **Метрики** — два формата: определения и кейсы
+- **Работа над ошибками** — банк вопросов, на которых ошибались; верный ответ убирает вопрос из банка
+- **Статистика** — прохождения, серия дней, разбор ошибок после квиза
 
 ## Запуск
 
@@ -28,31 +33,60 @@ npx serve .
 
 Перейдите на `http://localhost:8080`.
 
+## Сборка данных
+
+После правок в `data/questions-source.txt` или `data/topics.json`:
+
+```bash
+# Полная пересборка: config.js + questions.js + валидация
+node scripts/build.mjs
+
+# Или по шагам:
+node scripts/build-config.mjs
+node scripts/parse-questions.mjs   # парсит и автоматически запускает validate
+node scripts/validate-questions.mjs  # только проверка, без записи файлов
+```
+
+`validate-questions.mjs` завершится с кодом **1**, если:
+
+- у вопроса не 4 варианта или нет объяснения
+- дублируются `id` или текст вопроса
+- у «Метрик» нет `mode` (`определение` / `кейс`)
+- тема из `topics.json` не имеет ни одного вопроса
+
+Опционально — выровнять длину **неверных** ответов:
+
+```bash
+node scripts/clean-distractors.mjs
+node scripts/validate-questions.mjs
+```
+
 ## Структура проекта
 
 ```
-index.html          — разметка
-css/style.css       — стили
+index.html
+css/style.css
 js/
   app.js            — UI и логика квиза
   config.js         — темы (генерируется)
   knowledge.js      — база знаний и ссылки
   questions.js      — вопросы (генерируется)
   stats.js          — статистика localStorage
-  utils.js          — escapeHtml и утилиты
+  mistakes.js       — банк ошибок localStorage
+  utils.js          — escapeHtml, подписи длины раунда
 data/
-  topics.json       — единый конфиг тем (источник правды)
-  questions-source.txt — исходник вопросов в markdown
+  topics.json       — конфиг тем (источник правды)
+  questions-source.txt — исходник вопросов
 scripts/
-  build-config.mjs  — topics.json → config.js
-  parse-questions.mjs — source → questions.js
-  clean-distractors.mjs — очистка и баланс неверных ответов
-favicon.svg
+  build.mjs             — build-config + parse + validate
+  build-config.mjs      — topics.json → config.js
+  question-parser.mjs   — общий парсер и валидатор
+  parse-questions.mjs   — source → questions.js + validate
+  validate-questions.mjs
+  clean-distractors.mjs
 ```
 
-## Как обновить вопросы
-
-1. Отредактируйте `data/questions-source.txt` в формате:
+## Формат вопроса в source
 
 ```
 **1. Текст вопроса**
@@ -63,38 +97,33 @@ D) вариант
 *Верно:* B. *Объяснение:* ... *Пример:* ... (опционально)
 ```
 
-2. Пересоберите файлы:
+Для вопросов вне нумерации темы (например, кейсы 251+ в блоке «Метрики»):
 
-```bash
-node scripts/parse-questions.mjs
 ```
-
-3. Если нужно выровнять длину **неверных** ответов (правильные не трогаются):
-
-```bash
-node scripts/clean-distractors.mjs
+*Тема:* Метрики
+*Формат:* кейс
 ```
 
 ## Как добавить или изменить тему
 
-1. Отредактируйте `data/topics.json` — поля `id`, `name`, `icon`, `color`, `description`, `maxQuestion` (верхняя граница номера вопроса в source).
-2. Сгенерируйте `config.js`:
-
-```bash
-node scripts/build-config.mjs
-```
-
+1. Отредактируйте `data/topics.json` — `id`, `name`, `icon`, `color`, `description`, `maxQuestion`, опционально `modes`.
+2. `node scripts/build-config.mjs`
 3. Добавьте блок в `js/knowledge.js` (опционально).
-4. Пересоберите вопросы, если менялись номера.
+4. `node scripts/build.mjs`
 
 ## База знаний
 
-Материалы в `js/knowledge.js`. После обновления ссылок проверьте их в браузере — часть сайтов блокирует автоматические HTTP-проверки.
+Материалы в `js/knowledge.js`. Ссылки проверяйте в браузере.
 
-## Статистика
+## localStorage
 
-Хранится в `localStorage` под ключом `product-trainer-stats`. Сброс — кнопка «Сбросить статистику» на вкладке «Статистика».
+| Ключ | Содержимое |
+|------|------------|
+| `product-trainer-stats` | история прохождений |
+| `product-trainer-mistakes` | банк ошибок (по `id` вопроса) |
+
+Сброс статистики на вкладке «Статистика» также очищает банк ошибок. Устаревшие `id` (после пересборки вопросов) удаляются автоматически при открытии «Тренировки».
 
 ## Деплой
 
-Статический сайт: GitHub Pages, Netlify, Vercel — загрузите все файлы как есть.
+Статический сайт: GitHub Pages, Netlify, Vercel — загрузите все файлы как есть. Перед деплоем выполните `node scripts/build.mjs`.
