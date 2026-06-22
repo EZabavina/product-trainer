@@ -1,38 +1,39 @@
+// Generated from data/topics.json — run: node scripts/build-config.mjs
 const TOPIC_CONFIG = [
     {
-        id: "metrics",
-        name: "Метрики",
-        icon: "📊",
-        color: "#6366F1",
-        description: "AARRR, retention, LTV, когорты"
+        "id": "metrics",
+        "name": "Метрики",
+        "icon": "📊",
+        "color": "#6366F1",
+        "description": "AARRR, retention, LTV, когорты"
     },
     {
-        id: "finance",
-        name: "Финансовая модель",
-        icon: "💰",
-        color: "#10B981",
-        description: "P&L, runway, unit economics в финмодели"
+        "id": "finance",
+        "name": "Финансовая модель",
+        "icon": "💰",
+        "color": "#10B981",
+        "description": "P&L, runway, unit economics в финмодели"
     },
     {
-        id: "unit-economics",
-        name: "Юнит-экономика",
-        icon: "⚖️",
-        color: "#8B5CF6",
-        description: "CAC, LTV, маржинальность, payback"
+        "id": "unit-economics",
+        "name": "Юнит-экономика",
+        "icon": "⚖️",
+        "color": "#8B5CF6",
+        "description": "CAC, LTV, маржинальность, payback"
     },
     {
-        id: "jtbd",
-        name: "JTBD",
-        icon: "🎯",
-        color: "#F59E0B",
-        description: "Jobs, forces, switching interviews"
+        "id": "jtbd",
+        "name": "JTBD",
+        "icon": "🎯",
+        "color": "#F59E0B",
+        "description": "Jobs, forces, switching interviews"
     },
     {
-        id: "custdev",
-        name: "CustDev",
-        icon: "🗣️",
-        color: "#EC4899",
-        description: "Интервью, Mom Test, валидация"
+        "id": "custdev",
+        "name": "CustDev",
+        "icon": "🗣️",
+        "color": "#EC4899",
+        "description": "Интервью, Mom Test, валидация"
     }
 ];
 

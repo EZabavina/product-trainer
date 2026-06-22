@@ -67,8 +67,12 @@ function getStreak(sessions) {
 
     const days = [...new Set(sessions.map((s) => toDateKey(s.date)))].sort().reverse();
     const today = toDateKey(new Date().toISOString());
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = toDateKey(yesterday.toISOString());
+
     let streak = 0;
-    let check = today;
+    let check = days.includes(today) ? today : yesterdayKey;
 
     for (const day of days) {
         if (day === check) {

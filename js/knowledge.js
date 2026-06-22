@@ -19,8 +19,8 @@ North Star Metric отражает ценность для пользовате�
             {
                 type: "article",
                 lang: "ru",
-                title: "Как не надо считать Retention",
-                url: "https://gopractice.ru/product/how-to-calculate-retention/",
+                title: "N-day и Rolling Retention",
+                url: "https://gopractice.ru/product/nday-retention-rollling-retention/",
                 description: "Разбор Rolling vs Classic Retention — одна из самых частых ошибок продактов."
             },
             {
@@ -48,7 +48,7 @@ North Star Metric отражает ценность для пользовате�
                 type: "book",
                 lang: "en",
                 title: "Lean Analytics (Alistair Croll)",
-                url: "https://www.oreilly.com/library/view/lean-analytics/9781449335670/",
+                url: "https://leananalyticsbook.com/",
                 description: "Какая метрика важна на каком этапе стартапа. One Metric That Matters."
             }
         ]
@@ -66,16 +66,16 @@ P&L — начисления, Cash Flow — реальные деньги. Rule 
             {
                 type: "article",
                 lang: "ru",
-                title: "Финансовая модель стартапа",
-                url: "https://gopractice.ru/channels/startup-financial-model/",
+                title: "Финансовая модель стартапа — видео",
+                url: "https://gopractice.ru/free/vid_zabudko_smirnov/",
                 description: "GoPractice — как строить финмодель с нуля для продакта."
             },
             {
                 type: "guide",
                 lang: "en",
-                title: "Sequoia — Financial Models for Startups",
-                url: "https://www.sequoiacap.com/article/financial-models/",
-                description: "Шаблон и логика финмодели от Sequoia Capital."
+                title: "Sequoia — Frameworks for Product Success",
+                url: "https://articles.sequoiacap.com/frameworks-for-product-success",
+                description: "Фреймворки Sequoia: метрики, рост и финансовое планирование продукта."
             },
             {
                 type: "article",
@@ -88,7 +88,7 @@ P&L — начисления, Cash Flow — реальные деньги. Rule 
                 type: "article",
                 lang: "en",
                 title: "Rule of 40 — Brad Feld",
-                url: "https://feld.com/archives/2015/02/the-rule-of-40-for-a-healthy-saas-company/",
+                url: "https://feld.com/archives/2015/02/rule-40-healthy-saas-company/",
                 description: "Баланс роста и прибыльности в зрелом SaaS."
             },
             {
@@ -116,6 +116,13 @@ P&L — начисления, Cash Flow — реальные деньги. Rule 
 
 Считайте по когортам и каналам отдельно — blended CAC врёт. Freemium: LTV считается на платящих, но CAC — на всех привлечённых. COGS — переменные затраты на юнит (серверы, эквайринг, доставка).`,
         resources: [
+            {
+                type: "guide",
+                lang: "ru",
+                title: "Рабочая модель юнит-экономики (Google Sheets)",
+                url: "https://docs.google.com/spreadsheets/d/1SYMuPtRKHAdy4rhL3JYcoMcpH-0QMbqhFTzDwFI2KgY/edit?gid=631121018#gid=631121018",
+                description: "Реальный расчёт: LTV, CAC, ARPPU, конверсии, когорты и плечо метрик в таблице."
+            },
             {
                 type: "article",
                 lang: "ru",
@@ -148,14 +155,14 @@ P&L — начисления, Cash Flow — реальные деньги. Rule 
                 type: "article",
                 lang: "en",
                 title: "Andrew Chen — Marketplace Metrics",
-                url: "https://andrewchen.com/marketplace-metrics/",
+                url: "https://andrewchen.com/how-to-build-a-billion-dollar-digital-marketplace-examples-from-uber-ebay-craigslist-and-more/",
                 description: "Специфика юнит-экономики маркетплейсов и двусторонних рынков."
             },
             {
                 type: "guide",
                 lang: "en",
                 title: "a16z — 16 Startup Metrics",
-                url: "https://a16z.com/16-metrics/",
+                url: "https://a16z.com/16-startup-metrics/",
                 description: "16 ключевых метрик стартапа от Andreessen Horowitz."
             }
         ]
@@ -172,16 +179,16 @@ Switching Interview изучает момент смены решения. Се�
             {
                 type: "guide",
                 lang: "en",
-                title: "JTBD для стартапов — полный гайд",
-                url: "https://www.useresonant.com/blog/jobs-to-be-done-for-startups-guide-2024",
-                description: "PMF через JTBD: switching triggers, job success rate, интервью."
+                title: "Strategyn — What is Jobs-to-be-Done",
+                url: "https://strategyn.com/jobs-to-be-done/",
+                description: "Введение в JTBD от создателей Outcome-Driven Innovation: работы, outcomes, сегментация."
             },
             {
                 type: "article",
                 lang: "en",
-                title: "Intercom — Jobs-to-be-Done",
-                url: "https://www.intercom.com/blog/jobs-to-be-done/",
-                description: "Классическая серия статей Intercom — доступное введение в JTBD."
+                title: "Intercom — Job Stories",
+                url: "https://www.intercom.com/blog/using-job-stories-design-features-ui-ux/",
+                description: "Как применять JTBD в дизайне: job stories вместо user stories."
             },
             {
                 type: "article",
@@ -207,9 +214,9 @@ Switching Interview изучает момент смены решения. Се�
             {
                 type: "guide",
                 lang: "en",
-                title: "JTBD.info — Switching Interview",
-                url: "https://jtbd.info/",
-                description: "Сообщество практиков JTBD: шаблоны интервью, forces diagram."
+                title: "Switch Interview — Jim Kalbach",
+                url: "https://jimkalbach.com/switch-interview/",
+                description: "Метод switching interview: forces of progress, timeline, триггеры смены решения."
             }
         ]
     },
@@ -227,7 +234,7 @@ Switching Interview изучает момент смены решения. Се�
                 type: "guide",
                 lang: "en",
                 title: "Y Combinator — How to Talk to Users",
-                url: "https://www.ycombinator.com/library/6g-how-to-talk-to-users",
+                url: "https://www.ycombinator.com/library/Iq-how-to-talk-to-users",
                 description: "Бесплатный гайд YC: как проводить пользовательские интервью."
             },
             {
@@ -247,16 +254,16 @@ Switching Interview изучает момент смены решения. Се�
             {
                 type: "article",
                 lang: "ru",
-                title: "Как проводить CustDev-интервью",
-                url: "https://gopractice.ru/product/custdev/",
+                title: "Customer Development (CustDev)",
+                url: "https://gopractice.ru/skills/customer-development-custdev/",
                 description: "GoPractice — структура интервью, скринер, типичные ошибки."
             },
             {
                 type: "article",
                 lang: "en",
-                title: "First Round — 50 Questions to Ask in User Interviews",
-                url: "https://review.firstround.com/how-to-conduct-user-interviews",
-                description: "50 проверенных вопросов от First Round Capital."
+                title: "First Round — Early-Stage Customer Discovery",
+                url: "https://review.firstround.com/how-to-know-if-your-ideas-the-right-one-a-founders-guide-for-successful-early-stage-customer-discovery/",
+                description: "Гайд по customer discovery: как проверить идею до масштабирования."
             },
             {
                 type: "book",

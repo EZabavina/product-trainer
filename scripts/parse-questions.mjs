@@ -4,20 +4,13 @@ import { dirname, join } from "path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(join(__dirname, "../data/questions-source.txt"), "utf8");
-
-const TOPICS = [
-    { max: 50, name: "Метрики" },
-    { max: 100, name: "Финансовая модель" },
-    { max: 150, name: "Юнит-экономика" },
-    { max: 200, name: "JTBD" },
-    { max: 999, name: "CustDev" }
-];
+const TOPICS = JSON.parse(readFileSync(join(__dirname, "../data/topics.json"), "utf8"));
 
 function getTopic(num) {
     for (const t of TOPICS) {
-        if (num <= t.max) return t.name;
+        if (num <= t.maxQuestion) return t.name;
     }
-    return "CustDev";
+    return TOPICS[TOPICS.length - 1].name;
 }
 
 function parseQuestions(text) {
@@ -73,6 +66,14 @@ function parseQuestions(text) {
 }
 
 const questions = parseQuestions(source);
+
+const seen = new Set();
+for (const q of questions) {
+    const key = `${q.topic}::${q.question}`;
+    if (seen.has(key)) console.warn(`Duplicate question: ${q.question.slice(0, 60)}`);
+    seen.add(key);
+}
+
 const out = `const QUESTIONS = ${JSON.stringify(questions, null, 4)};\n`;
 writeFileSync(join(__dirname, "../js/questions.js"), out);
 console.log(`Parsed ${questions.length} questions`);

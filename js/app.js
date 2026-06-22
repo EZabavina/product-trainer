@@ -102,15 +102,15 @@ function renderTopics() {
             const miniClass = topic.count > 0 ? "topic-mini-stat" : "topic-mini-stat empty";
 
             return `
-            <div class="topic-card" data-topic="${topic.name}" style="--topic-color: ${topic.color}">
+            <div class="topic-card" data-topic="${escapeHtml(topic.name)}" style="--topic-color: ${topic.color}">
                 <div class="topic-card-header">
                     <span class="topic-icon">${topic.icon}</span>
-                    <h3>${topic.name}</h3>
+                    <h3>${escapeHtml(topic.name)}</h3>
                 </div>
-                <p class="topic-desc">${topic.description}</p>
+                <p class="topic-desc">${escapeHtml(topic.description)}</p>
                 <div class="topic-footer">
                     <span class="topic-count">${getQuestionCount(topic.name)} в базе · ${Math.min(QUESTIONS_PER_SESSION, getQuestionCount(topic.name))} за раунд</span>
-                    <span class="${miniClass}">${miniStat}</span>
+                    <span class="${miniClass}">${escapeHtml(miniStat)}</span>
                 </div>
             </div>
         `;
@@ -153,8 +153,8 @@ function renderStatsView() {
             const tip = d.count > 0 ? `${d.count} раз · ср. ${d.avg}%` : "Нет данных";
             return `
             <div class="activity-bar-wrap">
-                <div class="activity-bar" style="height: ${h}%" data-tip="${tip}"></div>
-                <span class="activity-label">${d.label}</span>
+                <div class="activity-bar" style="height: ${h}%" data-tip="${escapeHtml(tip)}"></div>
+                <span class="activity-label">${escapeHtml(d.label)}</span>
             </div>
         `;
         })
@@ -185,7 +185,7 @@ function renderStatsView() {
         <div class="topic-stat-card" style="--topic-color: ${t.color}">
             <div class="topic-stat-header">
                 <span>${t.icon}</span>
-                <h3>${t.name}</h3>
+                <h3>${escapeHtml(t.name)}</h3>
             </div>
             <div class="topic-stat-rows">
                 <div class="topic-stat-item">
@@ -219,8 +219,8 @@ function renderStatsView() {
             .map(
                 (s) => `
             <div class="session-row">
-                <span class="session-time">${formatDate(s.date)} ${formatTime(s.date)}</span>
-                <span class="session-topic">${s.topic}</span>
+                <span class="session-time">${escapeHtml(formatDate(s.date))} ${escapeHtml(formatTime(s.date))}</span>
+                <span class="session-topic">${escapeHtml(s.topic)}</span>
                 <span>${s.score}/${s.total}</span>
                 <span class="session-score ${scoreClass(s.percent)}">${s.percent}%</span>
             </div>
@@ -239,8 +239,8 @@ function renderKnowledgeView(filter = knowledgeFilter) {
         ${topics
             .map(
                 (t) => `
-            <button class="filter-chip ${filter === t.name ? "active" : ""}" data-filter="${t.name}" style="--chip-color: ${t.color}">
-                ${t.icon} ${t.name}
+            <button class="filter-chip ${filter === t.name ? "active" : ""}" data-filter="${escapeHtml(t.name)}" style="--chip-color: ${t.color}">
+                ${t.icon} ${escapeHtml(t.name)}
             </button>
         `
             )
@@ -261,13 +261,13 @@ function renderKnowledgeView(filter = knowledgeFilter) {
             const resources = kb.resources
                 .map(
                     (r) => `
-                <a class="resource-card" href="${r.url}" target="_blank" rel="noopener noreferrer">
+                <a class="resource-card" href="${escapeHtml(r.url)}" target="_blank" rel="noopener noreferrer">
                     <div class="resource-meta">
-                        <span class="resource-type">${RESOURCE_TYPE_LABELS[r.type] || r.type}</span>
+                        <span class="resource-type">${escapeHtml(RESOURCE_TYPE_LABELS[r.type] || r.type)}</span>
                         <span class="resource-lang">${r.lang === "ru" ? "RU" : "EN"}</span>
                     </div>
-                    <h4 class="resource-title">${r.title}</h4>
-                    <p class="resource-desc">${r.description}</p>
+                    <h4 class="resource-title">${escapeHtml(r.title)}</h4>
+                    <p class="resource-desc">${escapeHtml(r.description)}</p>
                     <span class="resource-link">Открыть →</span>
                 </a>
             `
@@ -278,11 +278,11 @@ function renderKnowledgeView(filter = knowledgeFilter) {
             <section class="knowledge-topic-block" id="kb-${topic.id}" style="--topic-color: ${topic.color}">
                 <div class="knowledge-topic-header">
                     <span class="topic-icon">${topic.icon}</span>
-                    <h3>${topic.name}</h3>
+                    <h3>${escapeHtml(topic.name)}</h3>
                 </div>
                 <details class="knowledge-summary" open>
                     <summary>📌 Шпаргалка по теме</summary>
-                    <pre class="summary-text">${kb.summary}</pre>
+                    <pre class="summary-text">${escapeHtml(kb.summary)}</pre>
                 </details>
                 <h4 class="resources-title">Материалы для изучения</h4>
                 <div class="resources-grid">${resources}</div>
@@ -367,7 +367,7 @@ function renderQuestion() {
         .map(
             (opt, i) => `
         <button class="option-btn" data-index="${i}">
-            <strong>${labels[i]}.</strong> ${opt}
+            <strong>${labels[i]}.</strong> ${escapeHtml(opt)}
         </button>
     `
         )
@@ -468,7 +468,12 @@ btnNext.addEventListener("click", () => {
     }
 });
 
-btnBack.addEventListener("click", () => showMainView("train"));
+btnBack.addEventListener("click", () => {
+    if (answered || currentIndex > 0) {
+        if (!confirm("Выйти из квиза? Текущий прогресс не сохранится.")) return;
+    }
+    showMainView("train");
+});
 btnRestart.addEventListener("click", () => startQuiz(currentTopic));
 btnHome.addEventListener("click", () => showMainView("train"));
 btnStudyTopic.addEventListener("click", () => openKnowledge(currentTopic));
