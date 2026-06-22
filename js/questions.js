@@ -203,9 +203,9 @@ const QUESTIONS = [
         "question": "Какие существуют виды MRR?",
         "options": [
             "New, Expansion, Churn, Contraction, Reactivation.",
-            ".",
-            ".",
-            "."
+            "Gross, Net, Brutto, Netto.",
+            "Monthly, Weekly, Daily, Hourly.",
+            "Free, Trial, Paid, Lost."
         ],
         "correct": 0,
         "explanation": "New (новые), Expansion (допродажи), Churn (ушедшие), Contraction (снизившие тариф), Reactivation (вернувшиеся)."
@@ -228,8 +228,8 @@ const QUESTIONS = [
         "options": [
             "LTV = ARPU / Churn Rate.",
             "LTV = ARPU * Churn Rate.",
-            ".",
-            "."
+            "LTV = CAC * 3.",
+            "LTV = MRR * 12."
         ],
         "correct": 0,
         "explanation": "Если пользователь приносит 10$ в месяц (ARPU), а отток 5% (0.05), то его Lifetime = 1/0.05 = 20 месяцев. LTV = 10 * 20 = 200$."
@@ -1334,7 +1334,7 @@ const QUESTIONS = [
             "LTV = (ARPU * Gross Margin) / Churn Rate.",
             "LTV = ARPU / (Gross Margin * Churn).",
             "LTV = ARPU * Churn / Gross Margin.",
-            "."
+            "LTV = ARPU * Lifetime (без учёта Gross Margin)."
         ],
         "correct": 0,
         "explanation": "(ARPU * Gross Margin) — это маржинальная прибыль с клиента в месяц. Делим на Churn (1/Lifetime) — получаем LTV в марже.",
@@ -1369,10 +1369,10 @@ const QUESTIONS = [
         "topic": "Юнит-экономика",
         "question": "Как связаны ARPU, ARPPU и CR? (Формула ARPU = ARPPU * CR).",
         "options": [
-            ".",
-            ".",
+            "ARPU = ARPPU / CR.",
+            "ARPPU = ARPU * CR.",
             "ARPU = ARPPU * CR (где CR в долях).",
-            "."
+            "ARPU = CR / ARPPU."
         ],
         "correct": 2,
         "explanation": "Если платящий платит 100$ (ARPPU), а конверсия в оплату 5% (0.05), то средний доход на *всех* скачавших (ARPU) = 100 * 0.05 = 5$."
@@ -1973,8 +1973,8 @@ const QUESTIONS = [
         "options": [
             "Plan, Define, Prepare, Execute, Monitor, Modify, Conclude.",
             "Awareness, Consideration, Purchase, Retention.",
-            ".",
-            "."
+            "Define, Locate, Prepare, Confirm, Execute, Monitor, Modify, Conclude.",
+            "Discover, Design, Build, Launch, Support, Retain, Expand, Exit."
         ],
         "correct": 0,
         "explanation": "1. Define (определить), 2. Locate (найти ресурсы), 3. Prepare (подготовить), 4. Confirm (проверить), 5. Execute (выполнить), 6. Monitor (отслеживать), 7. Modify (внести правки), 8. Conclude (завершить)."
@@ -2116,7 +2116,7 @@ const QUESTIONS = [
         "topic": "JTBD",
         "question": "Опишите \"Habit\" (Привычка) как барьер для перехода.",
         "options": [
-            ".",
+            "Инерция текущего поведения: пользователь продолжает делать по-старому, потому что так привычнее.",
             "Сила, тянущая к новому.",
             "Базовая работа.",
             "Эмоциональная работа."

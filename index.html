@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Тренажёр для продакт-менеджеров: метрики, финмодель, юнит-экономика, JTBD, CustDev — 250 вопросов с базой знаний.">
     <title>Тренажёр Продакта</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -14,13 +16,13 @@
 <body>
     <div class="app">
         <header class="app-header">
-            <div class="brand">
-                <span class="brand-icon">🚀</span>
+            <button type="button" class="brand" id="btn-brand" aria-label="На главную — Тренировка">
+                <span class="brand-icon" aria-hidden="true">🚀</span>
                 <div>
-                    <h1 class="brand-title">Тренажёр Продакта</h1>
-                    <p class="brand-sub">Метрики · Финмодель · Юнит-экономика · JTBD · CustDev</p>
+                    <span class="brand-title">Тренажёр Продакта</span>
+                    <span class="brand-sub">Метрики · Финмодель · Юнит-экономика · JTBD · CustDev</span>
                 </div>
-            </div>
+            </button>
             <nav class="nav-tabs">
                 <button class="nav-tab active" data-view="train">Тренировка</button>
                 <button class="nav-tab" data-view="knowledge">База знаний</button>
@@ -116,8 +118,13 @@
                     <h2 class="results-title" id="results-topic"></h2>
                     <p class="results-detail" id="results-detail"></p>
                     <div class="results-recommendation" id="results-recommendation"></div>
+                    <div class="results-mistakes hidden" id="results-mistakes">
+                        <h3 class="results-mistakes-title">Разбор ошибок</h3>
+                        <div class="results-mistakes-list" id="results-mistakes-list"></div>
+                    </div>
                     <div class="results-knowledge hidden" id="results-knowledge">
-                        <button class="btn btn-knowledge" id="btn-study-after-results">📚 Повторить теорию в базе знаний</button>
+                        <p class="results-knowledge-hint" id="results-knowledge-hint"></p>
+                        <button class="btn btn-knowledge" id="btn-study-after-results">📚 Перейти к обучению по теме</button>
                     </div>
                     <div class="results-actions">
                         <button class="btn btn-primary" id="btn-restart">Пройти снова</button>

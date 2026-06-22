@@ -12,6 +12,7 @@ const GENERIC_TAIL =
 
 function stripGenericTails(text) {
     let result = text.trim();
+    if (!result || result === ".") return result;
     let prev;
     do {
         prev = result;

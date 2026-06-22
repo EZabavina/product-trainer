@@ -3,6 +3,7 @@ let quizQuestions = [];
 let currentIndex = 0;
 let score = 0;
 let answered = false;
+let wrongAnswers = [];
 
 const trainView = document.getElementById("train-view");
 const statsView = document.getElementById("stats-view");
@@ -32,7 +33,10 @@ const resultsTopic = document.getElementById("results-topic");
 const resultsScore = document.getElementById("results-score");
 const resultsDetail = document.getElementById("results-detail");
 const resultsRecommendation = document.getElementById("results-recommendation");
+const resultsMistakes = document.getElementById("results-mistakes");
+const resultsMistakesList = document.getElementById("results-mistakes-list");
 const resultsKnowledge = document.getElementById("results-knowledge");
+const resultsKnowledgeHint = document.getElementById("results-knowledge-hint");
 const btnStudyAfterResults = document.getElementById("btn-study-after-results");
 const ringFill = document.getElementById("ring-fill");
 const statsHero = document.getElementById("stats-hero");
@@ -43,6 +47,8 @@ const topicStatsGrid = document.getElementById("topic-stats-grid");
 const sessionsList = document.getElementById("sessions-list");
 const topicFilters = document.getElementById("topic-filters");
 const knowledgeContent = document.getElementById("knowledge-content");
+const mainEl = document.querySelector(".main");
+const btnBrand = document.getElementById("btn-brand");
 
 let knowledgeFilter = "all";
 
@@ -297,6 +303,37 @@ function renderKnowledgeView(filter = knowledgeFilter) {
     }
 }
 
+function navigateWithTransition(updateView) {
+    if (!mainEl) {
+        updateView();
+        return;
+    }
+
+    mainEl.classList.remove("is-entering");
+    mainEl.classList.add("is-fading");
+
+    window.setTimeout(() => {
+        updateView();
+        mainEl.classList.remove("is-fading");
+        mainEl.classList.add("is-entering");
+        window.setTimeout(() => mainEl.classList.remove("is-entering"), 320);
+    }, 180);
+}
+
+function goHome() {
+    const inActiveQuiz =
+        !quizScreen.classList.contains("hidden") && (answered || currentIndex > 0);
+
+    if (inActiveQuiz && !confirm("Выйти на главную? Текущий прогресс квиза не сохранится.")) {
+        return;
+    }
+
+    navigateWithTransition(() => {
+        showMainView("train");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+}
+
 function openKnowledge(topic) {
     knowledgeFilter = topic || "all";
     showMainView("knowledge");
@@ -338,6 +375,7 @@ function startQuiz(topic) {
     currentIndex = 0;
     score = 0;
     answered = false;
+    wrongAnswers = [];
 
     trainView.classList.add("hidden");
     statsView.classList.add("hidden");
@@ -404,6 +442,14 @@ function selectAnswer(selectedIndex) {
     feedbackExample.textContent = q.example ? `Пример: ${q.example}` : "";
 
     if (!isCorrect) {
+        wrongAnswers.push({
+            question: q.question,
+            selected: selectedIndex,
+            correct: q.correct,
+            options: q.options,
+            explanation: q.explanation,
+            example: q.example
+        });
         feedbackActions.classList.remove("hidden");
     } else {
         feedbackActions.classList.add("hidden");
@@ -412,6 +458,46 @@ function selectAnswer(selectedIndex) {
     btnNext.textContent =
         currentIndex < quizQuestions.length - 1 ? "Следующий вопрос →" : "Результаты →";
     btnNext.classList.remove("hidden");
+}
+
+function renderMistakesReview() {
+    const labels = ["A", "B", "C", "D"];
+
+    if (wrongAnswers.length === 0) {
+        resultsMistakes.classList.add("hidden");
+        resultsMistakesList.innerHTML = "";
+        resultsKnowledge.classList.add("hidden");
+        return;
+    }
+
+    resultsMistakes.classList.remove("hidden");
+    resultsMistakesList.innerHTML = wrongAnswers
+        .map(
+            (w, i) => `
+        <article class="mistake-item">
+            <div class="mistake-header">
+                <span class="mistake-num">${i + 1}</span>
+                <p class="mistake-question">${escapeHtml(w.question)}</p>
+            </div>
+            <div class="mistake-body">
+                <div class="mistake-answer mistake-answer-wrong">
+                    <div class="mistake-label">Ваш ответ</div>
+                    <div class="mistake-answer-text"><strong>${labels[w.selected]}.</strong> ${escapeHtml(w.options[w.selected])}</div>
+                </div>
+                <div class="mistake-answer mistake-answer-correct">
+                    <div class="mistake-label">Правильно</div>
+                    <div class="mistake-answer-text"><strong>${labels[w.correct]}.</strong> ${escapeHtml(w.options[w.correct])}</div>
+                </div>
+                <div class="mistake-explanation">${escapeHtml(w.explanation)}</div>
+                ${w.example ? `<div class="mistake-example">Пример: ${escapeHtml(w.example)}</div>` : ""}
+            </div>
+        </article>
+    `
+        )
+        .join("");
+
+    resultsKnowledge.classList.remove("hidden");
+    resultsKnowledgeHint.textContent = `Вы ошиблись в ${wrongAnswers.length} из ${quizQuestions.length} вопросов — рекомендуем повторить материалы по теме «${currentTopic}».`;
 }
 
 function showResults() {
@@ -434,11 +520,7 @@ function showResults() {
     }
     resultsRecommendation.textContent = recommendation;
 
-    if (percent < 80) {
-        resultsKnowledge.classList.remove("hidden");
-    } else {
-        resultsKnowledge.classList.add("hidden");
-    }
+    renderMistakesReview();
 
     quizScreen.classList.add("hidden");
     resultsScreen.classList.remove("hidden");
@@ -478,6 +560,7 @@ btnRestart.addEventListener("click", () => startQuiz(currentTopic));
 btnHome.addEventListener("click", () => showMainView("train"));
 btnStudyTopic.addEventListener("click", () => openKnowledge(currentTopic));
 btnStudyAfterResults.addEventListener("click", () => openKnowledge(currentTopic));
+btnBrand.addEventListener("click", goHome);
 
 btnClearStats.addEventListener("click", () => {
     if (confirm("Удалить всю статистику? Это действие нельзя отменить.")) {
