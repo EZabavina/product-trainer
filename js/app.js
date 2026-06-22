@@ -1,4 +1,5 @@
 let currentTopic = null;
+let currentTopicMode = null;
 let quizQuestions = [];
 let currentIndex = 0;
 let score = 0;
@@ -49,6 +50,11 @@ const topicFilters = document.getElementById("topic-filters");
 const knowledgeContent = document.getElementById("knowledge-content");
 const mainEl = document.querySelector(".main");
 const btnBrand = document.getElementById("btn-brand");
+const modePicker = document.getElementById("mode-picker");
+const modePickerBackdrop = document.getElementById("mode-picker-backdrop");
+const modePickerClose = document.getElementById("mode-picker-close");
+const modePickerHeader = document.getElementById("mode-picker-header");
+const modePickerOptions = document.getElementById("mode-picker-options");
 
 let knowledgeFilter = "all";
 
@@ -64,8 +70,26 @@ function shuffle(array) {
     return arr;
 }
 
-function getQuestionCount(topicName) {
-    return QUESTIONS.filter((q) => q.topic === topicName).length;
+function getQuestionCount(topicName, mode = null) {
+    return QUESTIONS.filter((q) => {
+        if (q.topic !== topicName) return false;
+        if (mode) return q.mode === mode;
+        return true;
+    }).length;
+}
+
+function getSessionSize(poolSize) {
+    return Math.min(QUESTIONS_PER_SESSION, poolSize);
+}
+
+function getModeLabel(topicName, modeId) {
+    const cfg = getTopicConfig(topicName);
+    const mode = cfg.modes?.find((m) => m.id === modeId);
+    return mode ? mode.label : modeId;
+}
+
+function topicHasModes(topicName) {
+    return Boolean(getTopicConfig(topicName).modes?.length);
 }
 
 function scoreClass(percent) {
@@ -101,6 +125,11 @@ function renderTopics() {
 
     topicsGrid.innerHTML = topicStats
         .map((topic) => {
+            const cfg = getTopicConfig(topic.name);
+            const hasModes = Boolean(cfg.modes?.length);
+            const countText = hasModes
+                ? `${getQuestionCount(topic.name, "определение")} опр. · ${getQuestionCount(topic.name, "кейс")} кейсов`
+                : `${getQuestionCount(topic.name)} в базе · ${getSessionSize(getQuestionCount(topic.name))} за раунд`;
             const miniStat =
                 topic.count > 0
                     ? `Ср. ${topic.avg}% · ${topic.count} раз`
@@ -108,14 +137,14 @@ function renderTopics() {
             const miniClass = topic.count > 0 ? "topic-mini-stat" : "topic-mini-stat empty";
 
             return `
-            <div class="topic-card" data-topic="${escapeHtml(topic.name)}" style="--topic-color: ${topic.color}">
+            <div class="topic-card${hasModes ? " has-modes" : ""}" data-topic="${escapeHtml(topic.name)}" style="--topic-color: ${topic.color}">
                 <div class="topic-card-header">
                     <span class="topic-icon">${topic.icon}</span>
                     <h3>${escapeHtml(topic.name)}</h3>
                 </div>
                 <p class="topic-desc">${escapeHtml(topic.description)}</p>
                 <div class="topic-footer">
-                    <span class="topic-count">${getQuestionCount(topic.name)} в базе · ${Math.min(QUESTIONS_PER_SESSION, getQuestionCount(topic.name))} за раунд</span>
+                    <span class="topic-count">${countText}</span>
                     <span class="${miniClass}">${escapeHtml(miniStat)}</span>
                 </div>
             </div>
@@ -124,8 +153,50 @@ function renderTopics() {
         .join("");
 
     topicsGrid.querySelectorAll(".topic-card").forEach((card) => {
-        card.addEventListener("click", () => startQuiz(card.dataset.topic));
+        card.addEventListener("click", () => {
+            const topic = card.dataset.topic;
+            if (topicHasModes(topic)) openModePicker(topic);
+            else startQuiz(topic);
+        });
     });
+}
+
+function openModePicker(topic) {
+    const cfg = getTopicConfig(topic);
+    modePickerHeader.innerHTML = `
+        <span class="topic-icon">${cfg.icon}</span>
+        <h2 id="mode-picker-title">${escapeHtml(topic)}</h2>
+    `;
+
+    modePickerOptions.innerHTML = cfg.modes
+        .map((mode) => {
+            const count = getQuestionCount(topic, mode.id);
+            const perRound = getSessionSize(count);
+            return `
+            <button type="button" class="mode-option-btn" data-mode="${escapeHtml(mode.id)}" style="--mode-color: ${cfg.color}">
+                <span class="mode-option-icon">${mode.icon}</span>
+                <div class="mode-option-body">
+                    <h3>${escapeHtml(mode.label)}</h3>
+                    <p>${escapeHtml(mode.description)}</p>
+                    <span class="mode-option-count">${count} вопросов · ${perRound} за раунд</span>
+                </div>
+            </button>
+        `;
+        })
+        .join("");
+
+    modePickerOptions.querySelectorAll(".mode-option-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            closeModePicker();
+            startQuiz(topic, btn.dataset.mode);
+        });
+    });
+
+    modePicker.classList.remove("hidden");
+}
+
+function closeModePicker() {
+    modePicker.classList.add("hidden");
 }
 
 function renderStatsView() {
@@ -226,7 +297,7 @@ function renderStatsView() {
                 (s) => `
             <div class="session-row">
                 <span class="session-time">${escapeHtml(formatDate(s.date))} ${escapeHtml(formatTime(s.date))}</span>
-                <span class="session-topic">${escapeHtml(s.topic)}</span>
+                <span class="session-topic">${escapeHtml(getSessionTopicLabel(s))}</span>
                 <span>${s.score}/${s.total}</span>
                 <span class="session-score ${scoreClass(s.percent)}">${s.percent}%</span>
             </div>
@@ -344,6 +415,7 @@ function setNavVisible(visible) {
 }
 
 function showMainView(view) {
+    closeModePicker();
     trainView.classList.add("hidden");
     statsView.classList.add("hidden");
     knowledgeView.classList.add("hidden");
@@ -368,10 +440,19 @@ function showMainView(view) {
     }
 }
 
-function startQuiz(topic) {
+function startQuiz(topic, mode = null) {
     currentTopic = topic;
-    const topicQuestions = QUESTIONS.filter((q) => q.topic === topic);
-    quizQuestions = shuffle(topicQuestions).slice(0, QUESTIONS_PER_SESSION);
+    currentTopicMode = mode;
+
+    let pool = QUESTIONS.filter((q) => q.topic === topic);
+    if (mode) pool = pool.filter((q) => q.mode === mode);
+
+    if (pool.length === 0) {
+        alert("В этом формате пока нет вопросов.");
+        return;
+    }
+
+    quizQuestions = shuffle(pool).slice(0, getSessionSize(pool.length));
     currentIndex = 0;
     score = 0;
     answered = false;
@@ -384,7 +465,10 @@ function startQuiz(topic) {
     setNavVisible(false);
 
     const cfg = getTopicConfig(topic);
-    quizTopicBadge.textContent = `${cfg.icon} ${topic}`;
+    const modeLabel = mode ? getModeLabel(topic, mode) : null;
+    quizTopicBadge.textContent = modeLabel
+        ? `${cfg.icon} ${topic} · ${modeLabel}`
+        : `${cfg.icon} ${topic}`;
     quizTopicBadge.style.borderColor = cfg.color + "44";
 
     renderQuestion();
@@ -504,9 +588,10 @@ function showResults() {
     const total = quizQuestions.length;
     const percent = Math.round((score / total) * 100);
 
-    recordSession(currentTopic, score, total);
+    recordSession(currentTopic, score, total, currentTopicMode);
 
-    resultsTopic.textContent = currentTopic;
+    const modeLabel = currentTopicMode ? getModeLabel(currentTopic, currentTopicMode) : null;
+    resultsTopic.textContent = modeLabel ? `${currentTopic} · ${modeLabel}` : currentTopic;
     resultsScore.textContent = `${percent}%`;
     resultsDetail.textContent = `${score} из ${total} правильных`;
 
@@ -556,11 +641,14 @@ btnBack.addEventListener("click", () => {
     }
     showMainView("train");
 });
-btnRestart.addEventListener("click", () => startQuiz(currentTopic));
+btnRestart.addEventListener("click", () => startQuiz(currentTopic, currentTopicMode));
 btnHome.addEventListener("click", () => showMainView("train"));
 btnStudyTopic.addEventListener("click", () => openKnowledge(currentTopic));
 btnStudyAfterResults.addEventListener("click", () => openKnowledge(currentTopic));
 btnBrand.addEventListener("click", goHome);
+
+modePickerBackdrop.addEventListener("click", closeModePicker);
+modePickerClose.addEventListener("click", closeModePicker);
 
 btnClearStats.addEventListener("click", () => {
     if (confirm("Удалить всю статистику? Это действие нельзя отменить.")) {

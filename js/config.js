@@ -5,7 +5,21 @@ const TOPIC_CONFIG = [
         "name": "Метрики",
         "icon": "📊",
         "color": "#6366F1",
-        "description": "AARRR, retention, LTV, когорты"
+        "description": "AARRR, retention, LTV, когорты",
+        "modes": [
+            {
+                "id": "определение",
+                "label": "Определения",
+                "icon": "📖",
+                "description": "Термины, формулы, различия понятий"
+            },
+            {
+                "id": "кейс",
+                "label": "Кейсы",
+                "icon": "🧩",
+                "description": "Ситуации и диагностика по метрикам"
+            }
+        ]
     },
     {
         "id": "finance",

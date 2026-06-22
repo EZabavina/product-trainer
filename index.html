@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Тренажёр для продакт-менеджеров: метрики, финмодель, юнит-экономика, JTBD, CustDev — 250 вопросов с базой знаний.">
+    <meta name="description" content="Тренажёр для продакт-менеджеров: метрики, финмодель, юнит-экономика, JTBD, CustDev — 265 вопросов с базой знаний.">
     <title>Тренажёр Продакта</title>
     <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -36,6 +36,17 @@
                 <div class="overview-strip" id="overview-strip"></div>
                 <h2 class="section-title">Выберите тему</h2>
                 <div class="topics-grid" id="topics-grid"></div>
+            </div>
+
+            <!-- Выбор формата (Метрики) -->
+            <div id="mode-picker" class="mode-picker hidden" role="dialog" aria-modal="true" aria-labelledby="mode-picker-title">
+                <div class="mode-picker-backdrop" id="mode-picker-backdrop"></div>
+                <div class="mode-picker-card">
+                    <button type="button" class="mode-picker-close" id="mode-picker-close" aria-label="Закрыть">×</button>
+                    <div class="mode-picker-header" id="mode-picker-header"></div>
+                    <p class="mode-picker-sub">Выберите формат тренировки</p>
+                    <div class="mode-picker-options" id="mode-picker-options"></div>
+                </div>
             </div>
 
             <!-- База знаний -->

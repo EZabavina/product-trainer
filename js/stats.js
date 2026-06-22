@@ -17,17 +17,25 @@ function saveStats(data) {
     localStorage.setItem(STATS_KEY, JSON.stringify(data));
 }
 
-function recordSession(topic, score, total) {
+function recordSession(topic, score, total, mode = null) {
     const data = loadStats();
     data.sessions.push({
         id: Date.now(),
         topic,
+        mode: mode || undefined,
         score,
         total,
         percent: total > 0 ? Math.round((score / total) * 100) : 0,
         date: new Date().toISOString()
     });
     saveStats(data);
+}
+
+function getSessionTopicLabel(session) {
+    if (!session.mode) return session.topic;
+    const cfg = getTopicConfig(session.topic);
+    const mode = cfg.modes?.find((m) => m.id === session.mode);
+    return mode ? `${session.topic} · ${mode.label}` : session.topic;
 }
 
 function toDateKey(iso) {
