@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тренажёр Продакта</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app">
+        <header class="app-header">
+            <div class="brand">
+                <span class="brand-icon">🚀</span>
+                <div>
+                    <h1 class="brand-title">Тренажёр Продакта</h1>
+                    <p class="brand-sub">Метрики · Финмодель · Юнит-экономика · JTBD · CustDev</p>
+                </div>
+            </div>
+            <nav class="nav-tabs">
+                <button class="nav-tab active" data-view="train">Тренировка</button>
+                <button class="nav-tab" data-view="knowledge">База знаний</button>
+                <button class="nav-tab" data-view="stats">Статистика</button>
+            </nav>
+        </header>
+
+        <main class="main">
+            <!-- Тренировка -->
+            <div id="train-view">
+                <div class="overview-strip" id="overview-strip"></div>
+                <h2 class="section-title">Выберите тему</h2>
+                <div class="topics-grid" id="topics-grid"></div>
+            </div>
+
+            <!-- База знаний -->
+            <div id="knowledge-view" class="hidden">
+                <p class="knowledge-intro">Материалы для углубления в тему. Откройте после ошибки в квизе или для самостоятельного изучения.</p>
+                <div class="topic-filters" id="topic-filters"></div>
+                <div id="knowledge-content"></div>
+            </div>
+
+            <!-- Статистика -->
+            <div id="stats-view" class="hidden">
+                <div class="stats-hero" id="stats-hero"></div>
+
+                <section class="stats-section">
+                    <h2 class="section-title">Активность за 14 дней</h2>
+                    <div class="activity-chart" id="activity-chart"></div>
+                </section>
+
+                <section class="stats-section" id="today-section">
+                    <h2 class="section-title">Сегодня по часам</h2>
+                    <div class="hourly-chart" id="hourly-chart"></div>
+                </section>
+
+                <section class="stats-section">
+                    <h2 class="section-title">По темам</h2>
+                    <div class="topic-stats-grid" id="topic-stats-grid"></div>
+                </section>
+
+                <section class="stats-section">
+                    <div class="section-header">
+                        <h2 class="section-title">Последние прохождения</h2>
+                        <button class="btn-text" id="btn-clear-stats">Сбросить статистику</button>
+                    </div>
+                    <div class="sessions-list" id="sessions-list"></div>
+                </section>
+            </div>
+
+            <!-- Квиз -->
+            <div id="quiz-screen" class="hidden">
+                <div class="quiz-top">
+                    <button class="btn-ghost" id="btn-back">← Назад</button>
+                    <div class="quiz-meta">
+                        <span class="quiz-topic-badge" id="quiz-topic-badge"></span>
+                        <span class="quiz-progress" id="quiz-progress"></span>
+                    </div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <div class="question-card">
+                    <div class="question-text" id="question-text"></div>
+                    <div class="options-list" id="options-list"></div>
+                </div>
+                <div class="feedback" id="feedback">
+                    <div class="feedback-icon" id="feedback-icon"></div>
+                    <div>
+                        <h4 id="feedback-title"></h4>
+                        <p id="feedback-explanation"></p>
+                        <p class="feedback-example" id="feedback-example"></p>
+                        <div class="feedback-actions hidden" id="feedback-actions">
+                            <button class="btn btn-knowledge" id="btn-study-topic">📚 Изучить тему в базе знаний</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="actions">
+                    <button class="btn btn-primary hidden" id="btn-next">Следующий вопрос</button>
+                </div>
+            </div>
+
+            <!-- Результаты -->
+            <div id="results-screen" class="hidden">
+                <div class="results-card">
+                    <div class="results-ring" id="results-ring">
+                        <svg viewBox="0 0 120 120">
+                            <circle class="ring-bg" cx="60" cy="60" r="52"/>
+                            <circle class="ring-fill" id="ring-fill" cx="60" cy="60" r="52"/>
+                        </svg>
+                        <span class="results-percent" id="results-score"></span>
+                    </div>
+                    <h2 class="results-title" id="results-topic"></h2>
+                    <p class="results-detail" id="results-detail"></p>
+                    <div class="results-recommendation" id="results-recommendation"></div>
+                    <div class="results-knowledge hidden" id="results-knowledge">
+                        <button class="btn btn-knowledge" id="btn-study-after-results">📚 Повторить теорию в базе знаний</button>
+                    </div>
+                    <div class="results-actions">
+                        <button class="btn btn-primary" id="btn-restart">Пройти снова</button>
+                        <button class="btn btn-secondary" id="btn-home">К темам</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/questions.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/knowledge.js"></script>
+    <script src="js/stats.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
