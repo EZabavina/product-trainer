@@ -51,6 +51,7 @@ const topicStatsGrid = document.getElementById("topic-stats-grid");
 const sessionsList = document.getElementById("sessions-list");
 const topicFilters = document.getElementById("topic-filters");
 const knowledgeContent = document.getElementById("knowledge-content");
+const gradesSection = document.getElementById("grades-section");
 const mainEl = document.querySelector(".main");
 const btnBrand = document.getElementById("btn-brand");
 const mistakesBanner = document.getElementById("mistakes-banner");
@@ -64,6 +65,9 @@ const setupFormatOptions = document.getElementById("setup-format-options");
 const setupFilterSection = document.getElementById("setup-filter-section");
 const setupFilterOptions = document.getElementById("setup-filter-options");
 const setupLengthOptions = document.getElementById("setup-length-options");
+const setupLengthSection = document.getElementById("setup-length-section");
+const setupScenarioSection = document.getElementById("setup-scenario-section");
+const setupScenarioOptions = document.getElementById("setup-scenario-options");
 const setupStart = document.getElementById("setup-start");
 const btnReviewMistakes = document.getElementById("btn-review-mistakes");
 
@@ -106,14 +110,45 @@ function getModeLabel(topicName, modeId) {
     return mode ? mode.label : modeId;
 }
 
+function getModeConfig(topicName, modeId) {
+    return getTopicConfig(topicName).modes?.find((m) => m.id === modeId);
+}
+
+function isInterviewMode(topicName, modeId) {
+    return getModeConfig(topicName, modeId)?.type === "interview";
+}
+
+function isQuizModeAll(topicName, modeId) {
+    const mode = getModeConfig(topicName, modeId);
+    return mode?.type === "quiz";
+}
+
 function getTopicCountText(topicName) {
     const cfg = getTopicConfig(topicName);
     if (cfg.modes?.length) {
         return cfg.modes
-            .map((m) => `${getQuestionCount(topicName, m.id)} ${m.label.toLowerCase()}`)
+            .map((m) => {
+                if (m.type === "interview") {
+                    return `${getInterviewScenarioCount()} сценариев`;
+                }
+                if (m.type === "quiz") {
+                    return `${getQuestionCount(topicName)} вопросов`;
+                }
+                return `${getQuestionCount(topicName, m.id)} ${m.label.toLowerCase()}`;
+            })
             .join(" · ");
     }
     return `${getQuestionCount(topicName)} в базе`;
+}
+
+function getModeCountLabel(topicName, mode) {
+    if (mode.type === "interview") {
+        return `${getInterviewScenarioCount()} сценариев`;
+    }
+    if (mode.type === "quiz") {
+        return `${getQuestionCount(topicName)} вопросов в базе`;
+    }
+    return `${getQuestionCount(topicName, mode.id)} вопросов в базе`;
 }
 
 function renderMistakesBanner() {
@@ -252,14 +287,14 @@ function renderQuizSetup() {
         if (cfg.modes?.length) {
             setupFormatOptions.innerHTML = cfg.modes
                 .map((mode) => {
-                    const count = getQuestionCount(pendingSetup.topic, mode.id);
+                    const countLabel = getModeCountLabel(pendingSetup.topic, mode);
                     return `
                     <button type="button" class="mode-option-btn${pendingSetup.mode === mode.id ? " active" : ""}" data-mode="${escapeHtml(mode.id)}" style="--mode-color: ${cfg.color}">
                         <span class="mode-option-icon">${mode.icon}</span>
                         <div class="mode-option-body">
                             <h3>${escapeHtml(mode.label)}</h3>
                             <p>${escapeHtml(mode.description)}</p>
-                            <span class="mode-option-count">${count} вопросов в базе</span>
+                            <span class="mode-option-count">${countLabel}</span>
                         </div>
                     </button>
                 `;
@@ -269,12 +304,16 @@ function renderQuizSetup() {
             setupFormatOptions.querySelectorAll(".mode-option-btn").forEach((btn) => {
                 btn.addEventListener("click", () => {
                     pendingSetup.mode = btn.dataset.mode;
+                    if (!isInterviewMode(pendingSetup.topic, pendingSetup.mode)) {
+                        pendingSetup.scenarioId = null;
+                    }
                     renderQuizSetup();
                 });
             });
         }
 
         renderLengthOptions(cfg.color);
+        renderScenarioOptions(cfg.color);
     } else {
         quizSetupHeader.innerHTML = `
             <span class="topic-icon">🔄</span>
@@ -311,11 +350,58 @@ function renderQuizSetup() {
     }
 
     setupFilterSection.classList.toggle("hidden", pendingSetup.kind !== "mistakes");
-    setupStart.disabled = getSetupPool().length === 0;
-    setupStart.textContent =
-        getSetupPool().length === 0 ? "Нет вопросов" : `Начать · ${getSetupSessionSize()} вопросов`;
+
+    const isInterview =
+        pendingSetup.kind === "topic" &&
+        isInterviewMode(pendingSetup.topic, pendingSetup.mode);
+
+    setupLengthSection.classList.toggle("hidden", isInterview);
+    setupScenarioSection.classList.toggle("hidden", !isInterview);
+
+    if (isInterview) {
+        setupStart.disabled = !pendingSetup.scenarioId;
+        setupStart.textContent = pendingSetup.scenarioId
+            ? "Начать интервью"
+            : "Выберите сценарий";
+    } else {
+        setupStart.disabled = getSetupPool().length === 0;
+        setupStart.textContent =
+            getSetupPool().length === 0
+                ? "Нет вопросов"
+                : `Начать · ${getSetupSessionSize()} вопросов`;
+    }
 
     quizSetup.classList.remove("hidden");
+}
+
+function renderScenarioOptions(color) {
+    if (
+        !pendingSetup ||
+        pendingSetup.kind !== "topic" ||
+        !isInterviewMode(pendingSetup.topic, pendingSetup.mode)
+    ) {
+        return;
+    }
+
+    setupScenarioOptions.innerHTML = INTERVIEW_SCENARIOS.map(
+        (s) => `
+        <button type="button" class="mode-option-btn${pendingSetup.scenarioId === s.id ? " active" : ""}" data-scenario="${escapeHtml(s.id)}" style="--mode-color: ${color}">
+            <span class="mode-option-icon">👤</span>
+            <div class="mode-option-body">
+                <h3>${escapeHtml(s.title)}</h3>
+                <p>${escapeHtml(s.description)}</p>
+                <span class="mode-option-count">${escapeHtml(s.respondentPreview)}</span>
+            </div>
+        </button>
+    `
+    ).join("");
+
+    setupScenarioOptions.querySelectorAll(".mode-option-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            pendingSetup.scenarioId = btn.dataset.scenario;
+            renderQuizSetup();
+        });
+    });
 }
 
 function renderLengthOptions(color) {
@@ -347,9 +433,13 @@ function getSetupPool() {
 
     let pool = QUESTIONS.filter((q) => q.topic === pendingSetup.topic);
     const cfg = getTopicConfig(pendingSetup.topic);
-    if (cfg.modes?.length) {
-        if (!pendingSetup.mode) return [];
-        pool = pool.filter((q) => q.mode === pendingSetup.mode);
+    if (cfg.modes?.length && pendingSetup.mode) {
+        if (isInterviewMode(pendingSetup.topic, pendingSetup.mode)) {
+            return [];
+        }
+        if (!isQuizModeAll(pendingSetup.topic, pendingSetup.mode)) {
+            pool = pool.filter((q) => q.mode === pendingSetup.mode);
+        }
     }
     return pool;
 }
@@ -365,6 +455,17 @@ function closeQuizSetup() {
 
 function startQuizFromSetup() {
     if (!pendingSetup) return;
+
+    if (
+        pendingSetup.kind === "topic" &&
+        isInterviewMode(pendingSetup.topic, pendingSetup.mode)
+    ) {
+        if (!pendingSetup.scenarioId) return;
+        const scenarioId = pendingSetup.scenarioId;
+        closeQuizSetup();
+        startInterview(scenarioId);
+        return;
+    }
 
     const pool = getSetupPool();
     if (pool.length === 0) return;
@@ -414,6 +515,10 @@ function renderStatsView() {
             <div class="stat-pill-label">Серия дней</div>
         </div>
     `;
+
+    if (gradesSection && typeof renderGradesSectionHtml === "function") {
+        gradesSection.innerHTML = renderGradesSectionHtml();
+    }
 
     const activity = getActivityDays(14);
     const maxCount = Math.max(...activity.map((d) => d.count), 1);
@@ -593,6 +698,11 @@ function goHome() {
         return;
     }
 
+    if (typeof isInterviewActive === "function" && isInterviewActive()) {
+        if (!confirmLeaveInterview()) return;
+        closeInterview();
+    }
+
     navigateWithTransition(() => {
         showMainView("train");
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -610,6 +720,7 @@ function setNavVisible(visible) {
 
 function showMainView(view) {
     closeQuizSetup();
+    if (typeof closeInterview === "function") closeInterview();
     trainView.classList.add("hidden");
     statsView.classList.add("hidden");
     knowledgeView.classList.add("hidden");
@@ -777,6 +888,7 @@ function selectAnswer(selectedIndex) {
 
     if (!isCorrect) {
         wrongAnswers.push({
+            topic: q.topic,
             question: q.question,
             selected: selectedIndex,
             correct: q.correct,

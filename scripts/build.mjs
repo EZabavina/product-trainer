@@ -15,3 +15,4 @@ function run(script) {
 
 run("build-config.mjs");
 run("parse-questions.mjs");
+run("build-interview.mjs");

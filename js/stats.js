@@ -34,6 +34,10 @@ function recordSession(topic, score, total, mode = null, extras = {}) {
 }
 
 function getSessionTopicLabel(session) {
+    if (session.quizType === "interview") {
+        return "CustDev · Симулятор";
+    }
+
     if (session.quizType === "mistakes") {
         const base = "Работа над ошибками";
         const len = getSessionLengthLabel(session.sessionLength);

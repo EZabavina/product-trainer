@@ -1,0 +1,9 @@
+{
+  "name": "product-trainer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev-server.mjs",
+    "build": "node scripts/build.mjs && node scripts/build-interview.mjs"
+  }
+}

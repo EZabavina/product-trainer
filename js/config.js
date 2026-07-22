@@ -47,7 +47,23 @@ const TOPIC_CONFIG = [
         "name": "CustDev",
         "icon": "🗣️",
         "color": "#EC4899",
-        "description": "Интервью, Mom Test, валидация"
+        "description": "Интервью, Mom Test, валидация",
+        "modes": [
+            {
+                "id": "quiz",
+                "label": "Квиз",
+                "icon": "📋",
+                "type": "quiz",
+                "description": "50 вопросов по теории CustDev"
+            },
+            {
+                "id": "interview",
+                "label": "Симулятор",
+                "icon": "🎙️",
+                "type": "interview",
+                "description": "Интервью с AI-респондентом"
+            }
+        ]
     }
 ];
 

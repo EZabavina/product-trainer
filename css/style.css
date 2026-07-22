@@ -610,6 +610,147 @@ body::before {
     }
 }
 
+/* CustDev interview simulator */
+.interview-header {
+    margin-bottom: 16px;
+}
+
+.interview-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.interview-desc {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.interview-chat {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 320px;
+    max-height: 50vh;
+    overflow-y: auto;
+    padding: 16px;
+    margin-bottom: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.chat-bubble {
+    max-width: 88%;
+    padding: 12px 14px;
+    border-radius: 14px;
+    line-height: 1.45;
+}
+
+.chat-bubble-user {
+    align-self: flex-end;
+    background: color-mix(in srgb, var(--primary) 22%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
+.chat-bubble-ai {
+    align-self: flex-start;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+}
+
+.chat-bubble-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.chat-bubble-text {
+    font-size: 0.92rem;
+    white-space: pre-wrap;
+}
+
+.interview-status {
+    min-height: 1.2em;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+
+.interview-compose {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.interview-input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.92rem;
+    resize: vertical;
+    min-height: 56px;
+}
+
+.interview-input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.interview-compose-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.interview-debrief-card {
+    max-width: 720px;
+    margin: 0 auto;
+    text-align: left;
+}
+
+.interview-debrief-content {
+    text-align: left;
+    margin: 20px 0 24px;
+    line-height: 1.55;
+}
+
+.debrief-heading {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 18px 0 10px;
+    color: var(--text);
+}
+
+.debrief-heading:first-child {
+    margin-top: 0;
+}
+
+.debrief-list {
+    margin: 0 0 12px 18px;
+    padding: 0;
+}
+
+.debrief-item {
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.debrief-p {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+
 /* Stats view */
 .stats-hero {
     display: grid;
@@ -1141,6 +1282,179 @@ body::before {
     line-height: 1.5;
 }
 
+/* Levels / grades */
+.level-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    margin-top: 10px;
+}
+
+.level-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.level-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--level-color);
+    flex-shrink: 0;
+}
+
+.level-col-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin: 10px 0 6px;
+}
+
+.level-list {
+    margin: 0;
+    padding-left: 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.level-list li {
+    font-size: 0.85rem;
+    line-height: 1.45;
+    color: var(--text-muted);
+}
+
+.grades-intro,
+.grades-empty {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin-bottom: 16px;
+}
+
+.grades-intro strong {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.grades-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.grade-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    border-left: 3px solid var(--topic-color, var(--primary));
+}
+
+.grade-card-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.grade-card-title {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+}
+
+.grade-card-title h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0 0 4px;
+}
+
+.grade-card-meta {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+.grade-card-score {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.grade-badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #0F172A;
+    background: var(--level-color, var(--primary));
+    padding: 4px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+}
+
+.grade-percent {
+    font-size: 1.35rem;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--text);
+}
+
+.grade-bar {
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+    margin-bottom: 14px;
+}
+
+.grade-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--level-color, var(--primary));
+    transition: width 0.35s ease;
+}
+
+.grade-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+.grade-col {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+}
+
+.grade-col-known {
+    border-color: rgba(16, 185, 129, 0.25);
+}
+
+.grade-col-gaps {
+    border-color: rgba(245, 158, 11, 0.25);
+}
+
+.grade-col-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.grade-empty {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin: 8px 0 0;
+}
+
 .topic-filters {
     display: flex;
     flex-wrap: wrap;
@@ -1496,6 +1810,20 @@ body::before {
     .nav-tab {
         flex: 1;
         text-align: center;
+    }
+
+    .grade-split {
+        grid-template-columns: 1fr;
+    }
+
+    .grade-card-top {
+        flex-direction: column;
+    }
+
+    .grade-card-score {
+        align-items: flex-start;
+        flex-direction: row;
+        gap: 12px;
     }
 }
 

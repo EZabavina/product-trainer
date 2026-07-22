@@ -54,9 +54,13 @@
                         <h3 class="setup-section-title">Тема</h3>
                         <div class="setup-chips" id="setup-filter-options"></div>
                     </div>
-                    <div class="quiz-setup-section">
+                <div class="quiz-setup-section" id="setup-length-section">
                         <h3 class="setup-section-title">Длина раунда</h3>
                         <div class="setup-length-grid" id="setup-length-options"></div>
+                    </div>
+                    <div class="quiz-setup-section hidden" id="setup-scenario-section">
+                        <h3 class="setup-section-title">Сценарий</h3>
+                        <div class="mode-picker-options" id="setup-scenario-options"></div>
                     </div>
                     <button type="button" class="btn btn-primary setup-start-btn" id="setup-start">Начать</button>
                 </div>
@@ -64,7 +68,7 @@
 
             <!-- База знаний -->
             <div id="knowledge-view" class="hidden">
-                <p class="knowledge-intro">Материалы для углубления в тему. Откройте после ошибки в квизе или для самостоятельного изучения.</p>
+                <p class="knowledge-intro">Шпаргалки и материалы по темам. Уровни Middle/Senior смотрите в разделе «Статистика → Уровень по грейдам».</p>
                 <div class="topic-filters" id="topic-filters"></div>
                 <div id="knowledge-content"></div>
             </div>
@@ -72,6 +76,11 @@
             <!-- Статистика -->
             <div id="stats-view" class="hidden">
                 <div class="stats-hero" id="stats-hero"></div>
+
+                <section class="stats-section">
+                    <h2 class="section-title">Уровень по грейдам</h2>
+                    <div id="grades-section"></div>
+                </section>
 
                 <section class="stats-section">
                     <h2 class="section-title">Активность за 14 дней</h2>
@@ -157,6 +166,41 @@
                     </div>
                 </div>
             </div>
+
+            <!-- CustDev: симулятор интервью -->
+            <div id="interview-screen" class="hidden">
+                <div class="quiz-top">
+                    <button class="btn-ghost" id="interview-back">← Назад</button>
+                    <div class="quiz-meta">
+                        <span class="quiz-topic-badge" id="interview-badge"></span>
+                    </div>
+                </div>
+                <div class="interview-header">
+                    <h2 class="interview-title" id="interview-scenario-title"></h2>
+                    <p class="interview-desc" id="interview-scenario-desc"></p>
+                </div>
+                <div class="interview-chat" id="interview-chat"></div>
+                <p class="interview-status" id="interview-status"></p>
+                <div class="interview-compose">
+                    <textarea id="interview-input" class="interview-input" rows="2" placeholder="Ваш вопрос респонденту…" maxlength="1000"></textarea>
+                    <div class="interview-compose-actions">
+                        <button type="button" class="btn btn-secondary" id="interview-end">Завершить и разобрать</button>
+                        <button type="button" class="btn btn-primary" id="interview-send">Отправить</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="interview-debrief-screen" class="hidden">
+                <div class="results-card interview-debrief-card">
+                    <h2 class="results-title">Разбор интервью</h2>
+                    <div class="interview-debrief-content" id="interview-debrief-content"></div>
+                    <div class="results-actions">
+                        <button class="btn btn-primary" id="interview-debrief-back">Новое интервью</button>
+                        <button class="btn btn-knowledge" id="interview-debrief-knowledge">📚 База знаний</button>
+                        <button class="btn btn-secondary" id="interview-debrief-home">К темам</button>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
@@ -164,8 +208,11 @@
     <script src="js/config.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/knowledge.js"></script>
+    <script src="js/levels.js"></script>
     <script src="js/stats.js"></script>
     <script src="js/mistakes.js"></script>
+    <script src="js/interview-scenarios.js"></script>
+    <script src="js/interview.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>
