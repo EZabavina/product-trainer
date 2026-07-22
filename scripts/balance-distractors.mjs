@@ -322,9 +322,10 @@ function nextJustification(topic, claim, seed) {
         return fin(forms[seed % forms.length]);
     }
 
-    const j = `Ответ «${claimShort}» ${loc} не совпадает с нужным критерием (seed ${seed}).`;
+    // Без seed/цифр в UI: если пул исчерпан — короткая уникальная фраза без служебных хвостов
+    const j = `Неверный критерий ${loc}: «${claimShort}».`;
     usedJust.add(j);
-    return j;
+    return fin(j);
 }
 
 let balanced = 0;
