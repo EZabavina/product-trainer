@@ -103,17 +103,22 @@ function sendAnalyticsEvent(event) {
 
     try {
         const body = JSON.stringify({ source: "product-trainer", event });
-        if (navigator.sendBeacon) {
-            const blob = new Blob([body], { type: "application/json" });
-            navigator.sendBeacon(EVENTS_API_URL, blob);
-            return;
-        }
+        // fetch надёжнее sendBeacon на Vercel (body + JSON)
         fetch(EVENTS_API_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body,
             keepalive: true
-        }).catch(() => {});
+        }).catch(() => {
+            try {
+                if (navigator.sendBeacon) {
+                    const blob = new Blob([body], { type: "application/json" });
+                    navigator.sendBeacon(EVENTS_API_URL, blob);
+                }
+            } catch {
+                /* ignore */
+            }
+        });
     } catch {
         /* ignore network errors — локальный лог уже сохранён */
     }

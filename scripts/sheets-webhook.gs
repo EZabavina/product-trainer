@@ -1,16 +1,19 @@
 /**
  * Google Apps Script для записи ответов в Google Sheets.
  *
+ * ВАЖНО: скрипт должен быть привязан к таблице
+ * (в нужной Sheets: Расширения → Apps Script), не отдельный проект.
+ *
  * Установка:
- * 1. Создайте таблицу Sheets с листом "events".
- * 2. Расширения → Apps Script → вставьте этот код.
- * 3. Замените SHEET_NAME при необходимости.
- * 4. Развернуть → Новое развёртывание → Веб-приложение:
+ * 1. Откройте таблицу → Расширения → Apps Script → вставьте этот код.
+ * 2. Развернуть → Новое развёртывание → Веб-приложение:
  *    - Выполнять от: меня
  *    - Доступ: Все
- * 5. Скопируйте URL веб-приложения в Vercel env: EVENTS_WEBHOOK_URL
+ * 3. Скопируйте URL (.../exec) в Vercel: EVENTS_WEBHOOK_URL
+ * 4. После правок кода — новое развёртывание (новая версия) или
+ *    «Управлять развёртываниями» → карандаш → Новая версия.
  *
- * Колонки создаются автоматически при первом событии.
+ * Лист "events" создаётся автоматически.
  */
 
 var SHEET_NAME = "events";
@@ -18,12 +21,24 @@ var SHEET_NAME = "events";
 function doPost(e) {
   try {
     var body = {};
-    if (e && e.postData && e.postData.contents) {
-      body = JSON.parse(e.postData.contents);
+    var raw = e && e.postData && e.postData.contents ? e.postData.contents : "";
+    if (raw) {
+      body = JSON.parse(raw);
     }
 
     var event = body.event || body;
+    if (!event || !event.type) {
+      return jsonOut({ ok: false, error: "event.type required" });
+    }
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) {
+      return jsonOut({
+        ok: false,
+        error: "No active spreadsheet. Open Apps Script from the Sheet (Extensions → Apps Script)."
+      });
+    }
+
     var sheet = ss.getSheetByName(SHEET_NAME);
     if (!sheet) {
       sheet = ss.insertSheet(SHEET_NAME);
@@ -69,18 +84,18 @@ function doPost(e) {
       body.source || "product-trainer"
     ]);
 
-    return ContentService
-      .createTextOutput(JSON.stringify({ ok: true }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return jsonOut({ ok: true });
   } catch (err) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ ok: false, error: String(err) }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return jsonOut({ ok: false, error: String(err) });
   }
 }
 
 function doGet() {
+  return jsonOut({ ok: true, service: "product-trainer-sheets" });
+}
+
+function jsonOut(obj) {
   return ContentService
-    .createTextOutput(JSON.stringify({ ok: true, service: "product-trainer-sheets" }))
+    .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
