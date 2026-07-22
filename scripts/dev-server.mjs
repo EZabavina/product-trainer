@@ -4,6 +4,7 @@ import { join, extname } from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import handler from "../api/interview.js";
+import eventsHandler from "../api/events.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
@@ -52,7 +53,7 @@ function serveStatic(pathname, res) {
     res.end(readFileSync(filePath));
 }
 
-function runApi(req, res, body) {
+function runApi(apiHandler, req, res, body) {
     const mockReq = {
         method: req.method,
         body: body ? JSON.parse(body) : {}
@@ -77,7 +78,7 @@ function runApi(req, res, body) {
             res.end(data || "");
         }
     };
-    return handler(mockReq, mockRes);
+    return apiHandler(mockReq, mockRes);
 }
 
 const server = createServer((req, res) => {
@@ -86,11 +87,28 @@ const server = createServer((req, res) => {
     if (url.pathname === "/api/interview" && req.method === "POST") {
         let body = "";
         req.on("data", (chunk) => (body += chunk));
-        req.on("end", () => runApi(req, res, body));
+        req.on("end", () => runApi(handler, req, res, body));
         return;
     }
 
     if (url.pathname === "/api/interview" && req.method === "OPTIONS") {
+        res.writeHead(200, {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type"
+        });
+        res.end();
+        return;
+    }
+
+    if (url.pathname === "/api/events" && req.method === "POST") {
+        let body = "";
+        req.on("data", (chunk) => (body += chunk));
+        req.on("end", () => runApi(eventsHandler, req, res, body));
+        return;
+    }
+
+    if (url.pathname === "/api/events" && req.method === "OPTIONS") {
         res.writeHead(200, {
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "POST, OPTIONS",

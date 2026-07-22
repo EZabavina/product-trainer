@@ -1,6 +1,7 @@
 let currentTopic = null;
 let currentTopicMode = null;
 let currentSessionLength = "standard";
+let currentQuizSessionId = null;
 let currentQuizType = "topic";
 let currentMistakeFilter = "all";
 let quizQuestions = [];
@@ -52,6 +53,7 @@ const sessionsList = document.getElementById("sessions-list");
 const topicFilters = document.getElementById("topic-filters");
 const knowledgeContent = document.getElementById("knowledge-content");
 const gradesSection = document.getElementById("grades-section");
+const hardestQuestionsSection = document.getElementById("hardest-questions");
 const mainEl = document.querySelector(".main");
 const btnBrand = document.getElementById("btn-brand");
 const mistakesBanner = document.getElementById("mistakes-banner");
@@ -523,6 +525,10 @@ function renderStatsView() {
         }
     }
 
+    if (hardestQuestionsSection && typeof renderHardestQuestionsHtml === "function") {
+        hardestQuestionsSection.innerHTML = renderHardestQuestionsHtml(10);
+    }
+
     const activity = getActivityDays(14);
     const maxCount = Math.max(...activity.map((d) => d.count), 1);
 
@@ -743,6 +749,9 @@ function showMainView(view) {
     } else if (view === "stats") {
         statsView.classList.remove("hidden");
         renderStatsView();
+        if (typeof trackMetrika === "function") {
+            trackMetrika("view_stats");
+        }
     } else if (view === "knowledge") {
         knowledgeView.classList.remove("hidden");
         renderKnowledgeView(knowledgeFilter);
@@ -761,6 +770,17 @@ function launchQuiz({ pool, topic, mode, length, quizType, mistakeFilter = "all"
     score = 0;
     answered = false;
     wrongAnswers = [];
+    currentQuizSessionId = createQuizSessionId();
+
+    if (typeof trackMetrika === "function") {
+        trackMetrika("quiz_start", {
+            topic: topic || "",
+            quiz_type: quizType || "topic",
+            mode: mode || "",
+            length: length || "standard",
+            questions: quizQuestions.length
+        });
+    }
 
     trainView.classList.add("hidden");
     statsView.classList.add("hidden");
@@ -877,6 +897,18 @@ function selectAnswer(selectedIndex) {
         recordMistake(q);
     }
 
+    if (typeof recordAnswerOutcome === "function") {
+        recordAnswerOutcome({
+            questionId: q.id,
+            correct: isCorrect,
+            selectedIndex,
+            topic: q.topic,
+            mode: q.mode || currentTopicMode || null,
+            quizType: currentQuizType,
+            sessionId: currentQuizSessionId
+        });
+    }
+
     optionsList.querySelectorAll(".option-btn").forEach((btn, i) => {
         btn.disabled = true;
         if (i === q.correct) btn.classList.add("correct");
@@ -891,6 +923,7 @@ function selectAnswer(selectedIndex) {
 
     if (!isCorrect) {
         wrongAnswers.push({
+            id: q.id,
             topic: q.topic,
             question: q.question,
             selected: selectedIndex,
@@ -993,8 +1026,25 @@ function showResults() {
         score,
         total,
         currentTopicMode,
-        { sessionLength: currentSessionLength, quizType: currentQuizType }
+        {
+            sessionLength: currentSessionLength,
+            quizType: currentQuizType,
+            sessionId: currentQuizSessionId
+        }
     );
+
+    if (typeof recordSessionOutcome === "function") {
+        recordSessionOutcome({
+            topic: currentQuizType === "mistakes" ? "Ошибки" : currentTopic,
+            mode: currentTopicMode,
+            quizType: currentQuizType,
+            sessionId: currentQuizSessionId,
+            sessionLength: currentSessionLength,
+            score,
+            total,
+            percent
+        });
+    }
 
     resultsTopic.textContent = getResultsTitle();
     resultsScore.textContent = `${percent}%`;
@@ -1067,9 +1117,10 @@ quizSetupClose.addEventListener("click", closeQuizSetup);
 setupStart.addEventListener("click", startQuizFromSetup);
 
 btnClearStats.addEventListener("click", () => {
-    if (confirm("Удалить всю статистику и банк ошибок? Это действие нельзя отменить.")) {
+    if (confirm("Удалить всю статистику, журнал ответов и банк ошибок? Это действие нельзя отменить.")) {
         clearStats();
         clearAllMistakes();
+        if (typeof clearAnswerLog === "function") clearAnswerLog();
         renderStatsView();
         renderOverviewStrip();
         renderTopics();

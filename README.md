@@ -18,7 +18,9 @@
 - **Метрики** — два формата: определения и кейсы
 - **CustDev** — квиз + **симулятор интервью** с AI-респондентом (OpenRouter)
 - **Работа над ошибками** — банк вопросов, на которых ошибались; верный ответ убирает вопрос из банка
-- **Статистика** — прохождения, серия дней, разбор ошибок после квиза
+- **Статистика** — прохождения, серия дней, таблица скилов, **сложные вопросы** по истории ответов
+- **Журнал ответов** — каждый ответ пишется в `localStorage` и уходит на `/api/events` → Google Sheets (через Apps Script)
+- **Яндекс.Метрика** — счётчик + цели `quiz_start`, `quiz_answer`, `quiz_complete`, `view_stats`
 
 ## Запуск
 
@@ -36,7 +38,24 @@ cp .env.example .env   # вставьте OPENROUTER_API_KEY
 npm run dev            # http://localhost:8080 + /api/interview
 ```
 
-Деплой симулятора: [Vercel](https://vercel.com) — подключите репозиторий `EZabavina/product-trainer`, Framework Preset: **Other**, добавьте `OPENROUTER_API_KEY` в Environment Variables (Production + Preview). После деплоя квиз и AI-симулятор работают на одном URL. GitHub Pages — только квиз без AI.
+Деплой: [Vercel](https://vercel.com) — репозиторий `EZabavina/product-trainer`, Framework Preset: **Other**, env:
+
+| Переменная | Обязательно | Описание |
+|------------|-------------|----------|
+| `OPENROUTER_API_KEY` | для CustDev | ключ OpenRouter |
+| `EVENTS_WEBHOOK_URL` | для Sheets | URL веб-приложения Apps Script |
+
+GitHub Pages — только квиз без AI (без `/api`).
+
+### Google Sheets (сбор ответов)
+
+1. Создайте таблицу Google Sheets, лист `events`.
+2. **Расширения → Apps Script** — вставьте код из [`scripts/sheets-webhook.gs`](scripts/sheets-webhook.gs).
+3. **Развернуть → Новое развёртывание → Веб-приложение**: выполнять от вас, доступ «Все».
+4. Скопируйте URL (`…/macros/s/…/exec`) в Vercel → `EVENTS_WEBHOOK_URL`.
+5. Redeploy. Каждый ответ и итог сессии появятся строкой в таблице.
+
+Локально: тот же URL в `.env`, затем `npm run dev`.
 
 Перейдите на `http://localhost:8080`.
 

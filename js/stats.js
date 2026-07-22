@@ -25,6 +25,7 @@ function recordSession(topic, score, total, mode = null, extras = {}) {
         mode: mode || undefined,
         sessionLength: extras.sessionLength || undefined,
         quizType: extras.quizType || undefined,
+        sessionId: extras.sessionId || undefined,
         score,
         total,
         percent: total > 0 ? Math.round((score / total) * 100) : 0,
@@ -173,6 +174,7 @@ function getRecentSessions(limit = 20) {
 
 function clearStats() {
     localStorage.removeItem(STATS_KEY);
+    if (typeof clearAnswerLog === "function") clearAnswerLog();
 }
 
 function formatTime(iso) {
