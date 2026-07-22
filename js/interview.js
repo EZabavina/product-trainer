@@ -42,7 +42,8 @@ async function apiCall(body) {
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-        throw new Error(data.error || `Ошибка ${res.status}`);
+        const detail = data.detail ? ` (${data.detail})` : "";
+        throw new Error((data.error || `Ошибка ${res.status}`) + detail);
     }
     return data;
 }

@@ -1,5 +1,6 @@
 import { readFileSync } from "fs";
-import { join } from "path";
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
 import {
     buildRespondentPrompt,
     DEBRIEF_PROMPT,
@@ -7,18 +8,38 @@ import {
 } from "../lib/interview-prompts.mjs";
 
 const MODELS = [
-    { id: "google/gemma-4-26b-a4b-it:free", maxTokens: { chat: 500, debrief: 1500 } },
-    { id: "openai/gpt-oss-20b:free", maxTokens: { chat: 500, debrief: 1500 } },
-    { id: "tencent/hy3:free", maxTokens: { chat: 1500, debrief: 2500 } },
-    { id: "meta-llama/llama-3.3-70b-instruct:free", maxTokens: { chat: 500, debrief: 1500 } }
+    { id: "openrouter/free", maxTokens: { chat: 600, debrief: 1600 } },
+    { id: "google/gemma-4-26b-a4b-it:free", maxTokens: { chat: 600, debrief: 1600 } },
+    { id: "google/gemma-4-31b-it:free", maxTokens: { chat: 600, debrief: 1600 } },
+    { id: "openai/gpt-oss-20b:free", maxTokens: { chat: 600, debrief: 1600 } },
+    { id: "meta-llama/llama-3.3-70b-instruct:free", maxTokens: { chat: 600, debrief: 1600 } }
 ];
+
+const SITE_URL =
+    process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : "https://product-trainer-psi.vercel.app";
 
 let scenariosCache = null;
 
 function loadScenarios() {
     if (!scenariosCache) {
-        const path = join(process.cwd(), "data", "interview-scenarios.json");
-        scenariosCache = JSON.parse(readFileSync(path, "utf8"));
+        const candidates = [
+            join(dirname(fileURLToPath(import.meta.url)), "..", "data", "interview-scenarios.json"),
+            join(process.cwd(), "data", "interview-scenarios.json")
+        ];
+        let lastErr;
+        for (const path of candidates) {
+            try {
+                scenariosCache = JSON.parse(readFileSync(path, "utf8"));
+                return scenariosCache;
+            } catch (err) {
+                lastErr = err;
+            }
+        }
+        throw lastErr || new Error("interview-scenarios.json not found");
     }
     return scenariosCache;
 }
@@ -28,14 +49,30 @@ function getScenario(id) {
 }
 
 function extractContent(message) {
-    const content = message?.content?.trim();
-    if (content) return content;
+    if (!message) return "";
+    const content = message.content;
+    if (typeof content === "string" && content.trim()) return content.trim();
+    if (Array.isArray(content)) {
+        const text = content
+            .map((part) => (typeof part === "string" ? part : part?.text || ""))
+            .join("")
+            .trim();
+        if (text) return text;
+    }
+    const reasoning = message.reasoning || message.reasoning_content;
+    if (typeof reasoning === "string" && reasoning.trim()) return reasoning.trim();
     return "";
+}
+
+function publicErrorDetail(err) {
+    const raw = String(err?.message || err || "unknown");
+    return raw.replace(/sk-or-v1-[a-zA-Z0-9]+/g, "[key]").slice(0, 240);
 }
 
 function shouldTryNextModel(err) {
     if (!err.status) return true;
-    return err.status === 429 || err.status >= 500;
+    // Retry on rate limits, upstream errors, and auth/model-not-found so fallbacks can recover
+    return err.status === 401 || err.status === 402 || err.status === 403 || err.status === 404 || err.status === 429 || err.status >= 500;
 }
 
 async function callOpenRouter(messages, model, maxTokens = 400) {
@@ -44,7 +81,7 @@ async function callOpenRouter(messages, model, maxTokens = 400) {
         headers: {
             Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://github.com/EZabavina/product-trainer",
+            "HTTP-Referer": SITE_URL,
             "X-Title": "Product Trainer CustDev"
         },
         body: JSON.stringify({
@@ -156,9 +193,16 @@ export default async function handler(req, res) {
         return res.status(200).json({ content, model });
     } catch (err) {
         console.error("Interview API error:", err);
-        const status = err.status === 429 ? 429 : 500;
+        const status = err.status === 429 ? 429 : err.status === 402 ? 402 : 500;
+        const error =
+            status === 429
+                ? "Лимит запросов. Подождите минуту."
+                : status === 402
+                  ? "Нужны кредиты OpenRouter (free-лимит исчерпан)."
+                  : "Ошибка AI-сервиса";
         return res.status(status).json({
-            error: status === 429 ? "Лимит запросов. Подождите минуту." : "Ошибка AI-сервиса"
+            error,
+            detail: publicErrorDetail(err)
         });
     }
 }

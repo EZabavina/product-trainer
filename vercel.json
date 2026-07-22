@@ -6,7 +6,7 @@
   "functions": {
     "api/interview.js": {
       "maxDuration": 60,
-      "includeFiles": "data/interview-scenarios.json"
+      "includeFiles": "data/**"
     }
   }
 }
