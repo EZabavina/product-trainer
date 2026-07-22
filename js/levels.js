@@ -242,40 +242,131 @@ function splitCompetenciesByPercent(topicName, percent) {
 }
 
 /**
+ * Квиз-сессии по теме (без interview / mistakes).
+ */
+function getTopicQuizSessions(topicName) {
+    const sessions = (typeof loadStats === "function" ? loadStats() : { sessions: [] }).sessions;
+    return sessions.filter(
+        (s) =>
+            s.topic === topicName &&
+            s.quizType !== "interview" &&
+            s.quizType !== "mistakes" &&
+            typeof s.score === "number" &&
+            typeof s.total === "number"
+    );
+}
+
+/**
+ * Верные/ошибки из лучшей попытки по теме (+ число попыток).
+ */
+function getTopicBestAnswerStats(topicName) {
+    const topicSessions = getTopicQuizSessions(topicName);
+    if (!topicSessions.length) {
+        return { correct: 0, wrong: 0, total: 0, attempts: 0, bestPercent: null };
+    }
+
+    const best = topicSessions.reduce((a, b) => (b.percent > a.percent ? b : a));
+    return {
+        correct: best.score || 0,
+        wrong: Math.max(0, (best.total || 0) - (best.score || 0)),
+        total: best.total || 0,
+        attempts: topicSessions.length,
+        bestPercent: best.percent
+    };
+}
+
+/**
+ * Общий уровень: средний лучший % по ВСЕМ темам (непройденные = 0%).
+ * Так неполный профиль не завышает грейд.
+ */
+function getOverallProductLevel(snapshots) {
+    const list = snapshots || getGradeSnapshots();
+    const totalTopics = list.length || 1;
+    const tested = list.filter((s) => s.bestPercent !== null);
+
+    const avgPercent = Math.round(
+        list.reduce((sum, s) => sum + (s.bestPercent ?? 0), 0) / totalTopics
+    );
+
+    let correct = 0;
+    let wrong = 0;
+    tested.forEach((s) => {
+        correct += s.answers?.correct || 0;
+        wrong += s.answers?.wrong || 0;
+    });
+
+    const complete = tested.length === list.length && list.length > 0;
+    const level = tested.length === 0 ? null : getLevelByPercent(avgPercent);
+
+    return {
+        tested: tested.length,
+        totalTopics: list.length,
+        avgPercent: tested.length === 0 ? null : avgPercent,
+        level,
+        levelLabel: level ? overallLevelLabel(level) : null,
+        correct,
+        wrong,
+        complete
+    };
+}
+
+function overallLevelLabel(level) {
+    if (!level) return "";
+    if (level.id === "senior") return "Senior";
+    return level.label;
+}
+
+const SKILL_COLUMNS = [
+    { id: "middle-know", label: "Middle", sub: "знать", minPercent: 50, hint: "база терминов и определений" },
+    { id: "middle-can", label: "Middle", sub: "уметь", minPercent: 75, hint: "применение ≈ Strong Middle" },
+    { id: "senior-know", label: "Senior", sub: "знать", minPercent: 90, hint: "глубина и система метрик" },
+    { id: "senior-can", label: "Senior", sub: "уметь", minPercent: 95, hint: "диагностика и решения" }
+];
+
+function skillCellState(bestPercent, minPercent) {
+    if (bestPercent === null) return "empty";
+    return bestPercent >= minPercent ? "pass" : "fail";
+}
+
+function skillColumnTag(col) {
+    return `${col.label} · ${col.sub}`;
+}
+
+function skillsForColumn(snapshot, col) {
+    const tag = skillColumnTag(col);
+    const pool =
+        skillCellState(snapshot.bestPercent, col.minPercent) === "pass" ? snapshot.known : snapshot.gaps;
+    return (pool || []).filter((item) => item.tag === tag).map((item) => item.text);
+}
+
+/**
  * Сводка грейдов по темам из статистики квизов (без interview).
  */
 function getGradeSnapshots() {
-    const sessions = (typeof loadStats === "function" ? loadStats() : { sessions: [] }).sessions;
     const topics = getActiveTopics().filter((t) => TOPIC_COMPETENCIES[t.name]);
 
     return topics.map((topic) => {
-        const topicSessions = sessions.filter(
-            (s) =>
-                s.topic === topic.name &&
-                s.quizType !== "interview" &&
-                s.quizType !== "mistakes"
-        );
-        const best =
-            topicSessions.length > 0
-                ? Math.max(...topicSessions.map((s) => s.percent))
-                : null;
+        const topicSessions = getTopicQuizSessions(topic.name);
+        const answers = getTopicBestAnswerStats(topic.name);
+        const best = answers.bestPercent;
         const last = topicSessions.length > 0 ? topicSessions[topicSessions.length - 1] : null;
         const level = best !== null ? getLevelByPercent(best) : null;
         const split = best !== null ? splitCompetenciesByPercent(topic.name, best) : { known: [], gaps: [] };
 
         return {
             topic,
-            attempts: topicSessions.length,
+            attempts: answers.attempts,
             bestPercent: best,
             lastPercent: last ? last.percent : null,
             level,
             known: split.known,
-            gaps: split.gaps
+            gaps: split.gaps,
+            answers
         };
     });
 }
 
-function renderSkillItems(items, emptyText) {
+function renderSkillItemsList(items, emptyText) {
     if (!items.length) {
         return `<p class="grade-empty">${escapeHtml(emptyText)}</p>`;
     }
@@ -297,98 +388,234 @@ function renderSkillItems(items, emptyText) {
     return parts.join("");
 }
 
-function renderGradesSectionHtml() {
-    const snapshots = getGradeSnapshots();
-    const tested = snapshots.filter((s) => s.bestPercent !== null).length;
-
-    const legend = LEVEL_THRESHOLDS.map(
-        (l) => `
-        <span class="level-legend-item" style="--level-color: ${l.color}">
-            <span class="level-legend-dot"></span>
-            ${escapeHtml(l.label)} · ${l.minPercent}–${l.maxPercent}%
-        </span>
-    `
-    ).join("");
-
-    if (tested === 0) {
-        return `
-            <div class="grades-empty">
-                <p>Пока нет квизов по темам. Пройдите хотя бы один раунд — здесь появится грейд, % и список «знает / не знает».</p>
-                <div class="level-legend">${legend}</div>
-            </div>
-        `;
+function renderTopicDetailHtml(s) {
+    const hasData = s.bestPercent !== null;
+    if (!hasData) {
+        return `<p class="grade-empty">Пройдите квиз по теме, чтобы увидеть закрытые скилы и пробелы.</p>`;
     }
 
-    const cards = snapshots
+    return `
+        <div class="grade-split">
+            <div class="grade-col grade-col-known">
+                <h4 class="grade-col-title">Знает / умеет</h4>
+                ${renderSkillItemsList(s.known, "Пока рано — закройте базу Middle")}
+            </div>
+            <div class="grade-col grade-col-gaps">
+                <h4 class="grade-col-title">Пробелы</h4>
+                ${renderSkillItemsList(s.gaps, "Пробелов нет по текущей шкале")}
+            </div>
+        </div>
+    `;
+}
+
+function renderSkillMatrixHtml(snapshots) {
+    const head = SKILL_COLUMNS.map(
+        (col) => `
+        <th scope="col" class="skills-th-level" title="${escapeHtml(`${col.label} · ${col.sub}: ≥${col.minPercent}% · ${col.hint}`)}">
+            <span class="skills-th-main">${escapeHtml(col.label)}</span>
+            <span class="skills-th-sub">${escapeHtml(col.sub)} · ≥${col.minPercent}%</span>
+        </th>`
+    ).join("");
+
+    const body = snapshots
         .map((s) => {
             const hasData = s.bestPercent !== null;
-            const levelLabel = hasData ? s.level.label : "Не пройдено";
+            const answers = s.answers || getTopicBestAnswerStats(s.topic.name);
+            const levelLabel = hasData ? s.level.shortLabel : "—";
             const levelColor = hasData ? s.level.color : "#64748B";
-            const pct = hasData ? `${s.bestPercent}%` : "—";
-            const barWidth = hasData ? s.bestPercent : 0;
+            const topicId = s.topic.id || s.topic.name;
+
+            const cells = SKILL_COLUMNS.map((col) => {
+                const state = skillCellState(s.bestPercent, col.minPercent);
+                if (state === "empty") {
+                    return `<td class="skills-cell skills-cell-empty">—</td>`;
+                }
+                const tipItems = skillsForColumn(s, col);
+                const tip =
+                    tipItems.slice(0, 4).join(" · ") ||
+                    (state === "pass" ? "Порог пройден" : "Пока не закрыто");
+                if (state === "pass") {
+                    return `<td class="skills-cell skills-cell-pass" title="${escapeHtml(tip)}">
+                        <span class="skills-mark skills-mark-pass" aria-label="закрыто">✓</span>
+                    </td>`;
+                }
+                return `<td class="skills-cell skills-cell-fail" title="${escapeHtml(tip)}">
+                    <span class="skills-mark skills-mark-fail" aria-label="пробел">✗</span>
+                </td>`;
+            }).join("");
 
             return `
-            <article class="grade-card" style="--topic-color: ${s.topic.color}; --level-color: ${levelColor}">
-                <div class="grade-card-top">
-                    <div class="grade-card-title">
-                        <span class="topic-icon">${s.topic.icon}</span>
-                        <div>
-                            <h3>${escapeHtml(s.topic.name)}</h3>
-                            <p class="grade-card-meta">
-                                ${
-                                    hasData
-                                        ? `Лучший результат · ${s.attempts} ${pluralAttempts(s.attempts)}${
-                                              s.lastPercent !== null && s.lastPercent !== s.bestPercent
-                                                  ? ` · последний ${s.lastPercent}%`
-                                                  : ""
-                                          }`
-                                        : "Ещё не проходили квиз по теме"
-                                }
-                            </p>
-                        </div>
-                    </div>
-                    <div class="grade-card-score">
-                        <span class="grade-badge">${escapeHtml(levelLabel)}</span>
-                        <span class="grade-percent">${pct}</span>
-                    </div>
-                </div>
-                <div class="grade-bar" aria-hidden="true">
-                    <div class="grade-bar-fill" style="width: ${barWidth}%"></div>
-                </div>
-                ${
-                    hasData
-                        ? `<div class="grade-split">
-                            <div class="grade-col grade-col-known">
-                                <h4 class="grade-col-title">Знает / умеет</h4>
-                                ${renderSkillItems(s.known, "Пока рано — закройте базу Middle")}
-                            </div>
-                            <div class="grade-col grade-col-gaps">
-                                <h4 class="grade-col-title">Пробелы</h4>
-                                ${renderSkillItems(s.gaps, "Пробелов нет по текущей шкале")}
-                            </div>
-                        </div>`
-                        : ""
-                }
-            </article>
-        `;
+            <tr class="skills-row" tabindex="0" role="button" aria-expanded="false" data-topic-id="${escapeHtml(topicId)}" style="--topic-color: ${s.topic.color}; --level-color: ${levelColor}">
+                <th scope="row" class="skills-th-topic">
+                    <span class="skills-topic-icon">${s.topic.icon}</span>
+                    <span class="skills-topic-text">
+                        <span class="skills-topic-name">${escapeHtml(s.topic.name)}</span>
+                        <span class="skills-topic-level">${escapeHtml(levelLabel)}${hasData ? ` · ${s.bestPercent}%` : ""}</span>
+                    </span>
+                </th>
+                <td class="skills-cell skills-cell-answers">
+                    ${
+                        hasData
+                            ? `<span class="skills-answers-ok">✓ ${answers.correct}</span>
+                               <span class="skills-answers-bad">✗ ${answers.wrong}</span>
+                               <span class="skills-answers-note">лучшая</span>`
+                            : `<span class="skills-answers-empty">нет данных</span>`
+                    }
+                </td>
+                ${cells}
+            </tr>
+            <tr class="skills-detail-row hidden" data-topic-id="${escapeHtml(topicId)}">
+                <td colspan="6" class="skills-detail-cell">
+                    ${renderTopicDetailHtml(s)}
+                </td>
+            </tr>`;
         })
         .join("");
 
     return `
-        <div class="grades-intro">
-            <p>Грейд считается по <strong>лучшему %</strong> в квизе темы. Шкала: Middle от 50%, Strong Middle от 75%, Senior от 90%.</p>
-            <div class="level-legend">${legend}</div>
+        <div class="skills-table-wrap">
+            <table class="skills-table">
+                <thead>
+                    <tr>
+                        <th scope="col" class="skills-th-topic">Знания</th>
+                        <th scope="col" class="skills-th-answers">Лучшая попытка</th>
+                        ${head}
+                    </tr>
+                </thead>
+                <tbody>${body}</tbody>
+            </table>
         </div>
-        <div class="grades-list">${cards}</div>
+        <p class="skills-hint">Нажмите на строку темы — откроются закрытые скилы и пробелы.</p>
     `;
 }
 
-function pluralAttempts(n) {
-    const mod10 = n % 10;
-    const mod100 = n % 100;
-    if (mod10 === 1 && mod100 !== 11) return "попытка";
-    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "попытки";
-    return "попыток";
+function renderOverallLevelHtml(overall) {
+    if (!overall.level) {
+        return `
+            <div class="overall-level overall-level-empty">
+                <p>Пройдите квиз хотя бы по одной теме — появится ориентир уровня и таблица скилов.</p>
+            </div>
+        `;
+    }
+
+    const status = overall.complete
+        ? "профиль полный · все темы учтены"
+        : `неполный профиль · непройденные темы считаются как 0%`;
+
+    return `
+        <div class="overall-level" style="--level-color: ${overall.level.color}">
+            <div class="overall-level-main">
+                <p class="overall-level-kicker">${overall.complete ? "Общий уровень продакта" : "Ориентир уровня продакта"}</p>
+                <h3 class="overall-level-title">${escapeHtml(overall.levelLabel || overall.level.label)}</h3>
+                <p class="overall-level-meta">
+                    Средний лучший результат ${overall.avgPercent}% · темы ${overall.tested}/${overall.totalTopics}
+                    · ${escapeHtml(status)}
+                </p>
+            </div>
+            <div class="overall-level-stats">
+                <div class="overall-stat">
+                    <span class="overall-stat-value overall-stat-ok">✓ ${overall.correct}</span>
+                    <span class="overall-stat-label">верных (лучшие)</span>
+                </div>
+                <div class="overall-stat">
+                    <span class="overall-stat-value overall-stat-bad">✗ ${overall.wrong}</span>
+                    <span class="overall-stat-label">ошибок (лучшие)</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderSkillsLegendHtml() {
+    const gates = SKILL_COLUMNS.map(
+        (col) => `
+        <span class="level-legend-item" style="--level-color: ${col.minPercent >= 90 ? "#10B981" : col.minPercent >= 75 ? "#38BDF8" : "#F59E0B"}">
+            <span class="level-legend-dot"></span>
+            ${escapeHtml(col.label)} · ${escapeHtml(col.sub)} ≥${col.minPercent}%
+        </span>`
+    ).join("");
+
+    const bands = LEVEL_THRESHOLDS.map(
+        (l) => `
+        <span class="level-legend-item level-legend-band" style="--level-color: ${l.color}">
+            <span class="level-legend-dot"></span>
+            строка: ${escapeHtml(l.shortLabel)} · ${l.minPercent}–${l.maxPercent}%
+        </span>`
+    ).join("");
+
+    return `
+        <div class="level-legend">
+            <p class="level-legend-title">Колонки таблицы (пороги ✓)</p>
+            <div class="level-legend-row">${gates}</div>
+            <p class="level-legend-title">Подпись строки (уровень по лучшему % темы)</p>
+            <div class="level-legend-row">${bands}</div>
+        </div>
+    `;
+}
+
+function renderGradesSectionHtml() {
+    const snapshots = getGradeSnapshots();
+    const overall = getOverallProductLevel(snapshots);
+    const tested = snapshots.filter((s) => s.bestPercent !== null).length;
+
+    if (tested === 0) {
+        return `
+            ${renderOverallLevelHtml(overall)}
+            <div class="grades-empty">
+                <p>Пройдите квиз по темам — в таблице появятся ✓/✗ по уровням и счётчики лучшей попытки.</p>
+                ${renderSkillsLegendHtml()}
+            </div>
+            ${renderSkillMatrixHtml(snapshots)}
+        `;
+    }
+
+    return `
+        ${renderOverallLevelHtml(overall)}
+        <div class="grades-intro">
+            <p>
+                Слева — знания по темам, справа — уровни (знать / уметь).
+                В ячейках: <strong>✓ закрыто</strong> / <strong>✗ пробел</strong> по порогу %.
+                Колонка «Лучшая попытка» — верные и ошибки только из лучшего квиза темы.
+                Общий уровень = среднее лучших % по <strong>всем</strong> темам (непройденные = 0%).
+            </p>
+            ${renderSkillsLegendHtml()}
+        </div>
+        ${renderSkillMatrixHtml(snapshots)}
+    `;
+}
+
+function bindSkillsTableInteractions(root) {
+    if (!root) return;
+
+    const toggle = (topicId) => {
+        const row = root.querySelector(`.skills-row[data-topic-id="${topicId}"]`);
+        const detail = root.querySelector(`.skills-detail-row[data-topic-id="${topicId}"]`);
+        if (!row || !detail) return;
+
+        const open = detail.classList.contains("hidden");
+        root.querySelectorAll(".skills-detail-row").forEach((el) => el.classList.add("hidden"));
+        root.querySelectorAll(".skills-row").forEach((el) => {
+            el.classList.remove("is-open");
+            el.setAttribute("aria-expanded", "false");
+        });
+
+        if (open) {
+            detail.classList.remove("hidden");
+            row.classList.add("is-open");
+            row.setAttribute("aria-expanded", "true");
+        }
+    };
+
+    root.querySelectorAll(".skills-row[data-topic-id]").forEach((row) => {
+        const topicId = row.getAttribute("data-topic-id");
+        row.addEventListener("click", () => toggle(topicId));
+        row.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                toggle(topicId);
+            }
+        });
+    });
 }
 
 function assessTopicLevel(topicName, percent, options = {}) {
@@ -400,3 +627,4 @@ function assessTopicLevel(topicName, percent, options = {}) {
 
     return { level, topicName, isMistakes, summary };
 }
+

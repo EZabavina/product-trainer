@@ -518,6 +518,9 @@ function renderStatsView() {
 
     if (gradesSection && typeof renderGradesSectionHtml === "function") {
         gradesSection.innerHTML = renderGradesSectionHtml();
+        if (typeof bindSkillsTableInteractions === "function") {
+            bindSkillsTableInteractions(gradesSection);
+        }
     }
 
     const activity = getActivityDays(14);
