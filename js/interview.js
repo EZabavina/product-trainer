@@ -20,6 +20,10 @@ const interviewDebriefContent = document.getElementById("interview-debrief-conte
 const interviewDebriefBack = document.getElementById("interview-debrief-back");
 const interviewDebriefHome = document.getElementById("interview-debrief-home");
 const interviewDebriefKnowledge = document.getElementById("interview-debrief-knowledge");
+const interviewDebriefReplayHint = document.getElementById("interview-debrief-replay-hint");
+const interviewDebriefTranscript = document.getElementById("interview-debrief-transcript");
+
+let replayingInterviewId = null;
 
 function isInterviewActive() {
     return interviewActive;
@@ -153,9 +157,41 @@ async function endInterview() {
         interviewDebriefScreen.classList.remove("hidden");
         interviewDebriefContent.innerHTML = formatDebrief(data.content);
         setInterviewLoading(false);
-        recordSession("CustDev", 0, chatMessages.filter((m) => m.role === "user").length, null, {
-            quizType: "interview"
-        });
+
+        const userTurns = chatMessages.filter((m) => m.role === "user").length;
+        let savedOk = true;
+        let saveError = "";
+
+        try {
+            if (typeof saveInterviewRecord === "function") {
+                saveInterviewRecord({
+                    scenarioId: currentScenario.id,
+                    scenarioTitle: currentScenario.title,
+                    respondentName: currentScenario.respondentName,
+                    messages: chatMessages.slice(),
+                    debrief: data.content,
+                    userTurns
+                });
+            }
+            if (typeof recordSession === "function") {
+                recordSession("CustDev", 0, userTurns, null, {
+                    quizType: "interview"
+                });
+            }
+        } catch (saveErr) {
+            savedOk = false;
+            saveError = String(saveErr && saveErr.message ? saveErr.message : saveErr);
+            console.warn("Interview save failed:", saveErr);
+        }
+
+        if (interviewDebriefReplayHint) {
+            interviewDebriefReplayHint.textContent = savedOk
+                ? "Разбор сохранён — его можно открыть снова в Статистике."
+                : `Разбор получен, но не сохранился локально${saveError ? `: ${saveError}` : ""}.`;
+            interviewDebriefReplayHint.classList.remove("hidden");
+            if (!savedOk) interviewDebriefReplayHint.classList.add("is-error");
+            else interviewDebriefReplayHint.classList.remove("is-error");
+        }
     } catch (err) {
         setInterviewLoading(false);
         interviewStatus.textContent = err.message;
@@ -183,13 +219,67 @@ function closeInterview() {
     interviewActive = false;
     currentScenario = null;
     chatMessages = [];
+    replayingInterviewId = null;
     interviewScreen.classList.add("hidden");
     interviewDebriefScreen.classList.add("hidden");
+    if (interviewDebriefTranscript) {
+        interviewDebriefTranscript.innerHTML = "";
+        interviewDebriefTranscript.classList.add("hidden");
+    }
+    if (interviewDebriefReplayHint) {
+        interviewDebriefReplayHint.classList.add("hidden");
+        interviewDebriefReplayHint.classList.remove("is-error");
+        interviewDebriefReplayHint.textContent = "";
+    }
+}
+
+function replayInterviewRecord(id) {
+    const record = typeof getInterviewRecord === "function" ? getInterviewRecord(id) : null;
+    if (!record) return;
+
+    replayingInterviewId = id;
+    interviewActive = false;
+    currentScenario = getInterviewScenario(record.scenarioId) || {
+        id: record.scenarioId,
+        title: record.scenarioTitle,
+        respondentName: record.respondentName
+    };
+    chatMessages = record.messages || [];
+
+    document.getElementById("train-view")?.classList.add("hidden");
+    document.getElementById("stats-view")?.classList.add("hidden");
+    document.getElementById("quiz-screen")?.classList.add("hidden");
+    document.getElementById("results-screen")?.classList.add("hidden");
+    interviewScreen.classList.add("hidden");
+    interviewDebriefScreen.classList.remove("hidden");
+    document.querySelector(".nav-tabs")?.classList.add("hidden");
+
+    interviewDebriefContent.innerHTML = formatDebrief(record.debrief || "");
+    if (interviewDebriefReplayHint) {
+        interviewDebriefReplayHint.textContent = `Повтор разбора · ${record.scenarioTitle || record.scenarioId}`;
+        interviewDebriefReplayHint.classList.remove("hidden");
+    }
+    if (interviewDebriefTranscript) {
+        const name = record.respondentName || currentScenario?.respondentName || "Респондент";
+        interviewDebriefTranscript.classList.remove("hidden");
+        interviewDebriefTranscript.innerHTML = `
+            <h3 class="debrief-heading">Диалог</h3>
+            ${(record.messages || [])
+                .map((m) => {
+                    const isUser = m.role === "user";
+                    return `<div class="chat-bubble ${isUser ? "chat-bubble-user" : "chat-bubble-ai"}">
+                        <div class="chat-bubble-label">${isUser ? "Вы" : escapeHtml(name)}</div>
+                        <div class="chat-bubble-text">${escapeHtml(m.content)}</div>
+                    </div>`;
+                })
+                .join("")}
+        `;
+    }
 }
 
 function confirmLeaveInterview() {
     if (!interviewActive) return true;
-    return confirm("Выйти из интервью? Прогресс не сохранится.");
+    return confirm("Выйти из интервью? Текущий диалог не сохранится, пока не завершите разбор.");
 }
 
 interviewSend.addEventListener("click", sendInterviewMessage);

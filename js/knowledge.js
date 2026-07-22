@@ -291,3 +291,27 @@ function getKnowledgeTopics() {
 function getKnowledgeForTopic(topicName) {
     return KNOWLEDGE_BASE[topicName] || null;
 }
+
+/** Короткие пункты шпаргалки (без заголовка). */
+function getCheatSheetBullets(topicName, limit = 5) {
+    const kb = getKnowledgeForTopic(topicName);
+    if (!kb?.summary) return [];
+    return kb.summary
+        .split("\n")
+        .map((l) => l.replace(/^•\s*/, "").trim())
+        .filter((l) => l && !l.endsWith(":") && l.length > 8)
+        .slice(0, limit);
+}
+
+function formatCheatSheetHtml(topicName, limit = 4) {
+    const bullets = getCheatSheetBullets(topicName, limit);
+    if (!bullets.length) return "";
+    return `
+        <div class="inline-cheatsheet">
+            <div class="inline-cheatsheet-title">Шпаргалка · ${escapeHtml(topicName)}</div>
+            <ul class="inline-cheatsheet-list">
+                ${bullets.map((b) => `<li>${escapeHtml(b)}</li>`).join("")}
+            </ul>
+        </div>
+    `;
+}

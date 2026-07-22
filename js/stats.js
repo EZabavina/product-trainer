@@ -175,6 +175,101 @@ function getRecentSessions(limit = 20) {
 function clearStats() {
     localStorage.removeItem(STATS_KEY);
     if (typeof clearAnswerLog === "function") clearAnswerLog();
+    if (typeof clearInterviewHistory === "function") clearInterviewHistory();
+}
+
+function csvEscape(value) {
+    const s = value == null ? "" : String(value);
+    if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+}
+
+function downloadTextFile(filename, text, mime = "text/csv;charset=utf-8") {
+    const blob = new Blob(["\uFEFF" + text], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}
+
+/** Экспорт прогресса: сессии + ответы в один CSV. */
+function exportProgressCsv() {
+    const sessions = loadStats().sessions || [];
+    const events =
+        typeof loadAnswerLog === "function" ? loadAnswerLog().events || [] : [];
+
+    const rows = [
+        [
+            "kind",
+            "date",
+            "topic",
+            "mode",
+            "quizType",
+            "sessionLength",
+            "sessionId",
+            "score",
+            "total",
+            "percent",
+            "questionId",
+            "correct",
+            "selectedIndex"
+        ].join(",")
+    ];
+
+    sessions.forEach((s) => {
+        rows.push(
+            [
+                "session",
+                s.date,
+                s.topic,
+                s.mode || "",
+                s.quizType || "",
+                s.sessionLength || "",
+                s.sessionId || "",
+                s.score,
+                s.total,
+                s.percent,
+                "",
+                "",
+                ""
+            ]
+                .map(csvEscape)
+                .join(",")
+        );
+    });
+
+    events.forEach((e) => {
+        // Сессии уже из loadStats — type:"session" из журнала ответов не дублируем
+        if (e.type !== "answer") return;
+        rows.push(
+            [
+                "answer",
+                e.date,
+                e.topic || "",
+                e.mode || "",
+                e.quizType || "",
+                "",
+                e.sessionId || "",
+                "",
+                "",
+                "",
+                e.questionId ?? "",
+                e.correct === true ? "1" : e.correct === false ? "0" : "",
+                e.selectedIndex ?? ""
+            ]
+                .map(csvEscape)
+                .join(",")
+        );
+    });
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    const answerCount = events.filter((e) => e.type === "answer").length;
+    downloadTextFile(`product-trainer-progress-${stamp}.csv`, rows.join("\n"));
+    return { sessions: sessions.length, events: answerCount };
 }
 
 function formatTime(iso) {

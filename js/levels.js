@@ -211,34 +211,114 @@ function getAllCompetencyTopics() {
 }
 
 /**
- * Делит компетенции на «закрыто» / «пробелы» по лучшему %.
- * Middle.знать ≥50 · Middle.уметь ≥75 · Senior.знать ≥90 · Senior.уметь ≥95
+ * Делит компетенции на «закрыто» / «пробелы».
+ * Если есть ответы по связанным вопросам — по ним;
+ * иначе — порог % колонки (Middle знать ≥50 … Senior уметь ≥95).
  */
 function splitCompetenciesByPercent(topicName, percent) {
-    const c = getTopicCompetencies(topicName);
-    if (!c) return { known: [], gaps: [] };
+    const items = listCompetenciesForTopic(topicName);
+    if (!items.length) return { known: [], gaps: [] };
 
     const known = [];
     const gaps = [];
     const p = Number(percent) || 0;
 
-    const push = (list, items, tag) => {
-        items.forEach((item) => list.push({ text: item, tag }));
-    };
-
-    if (p >= 50) push(known, c.middle.know, "Middle · знать");
-    else push(gaps, c.middle.know, "Middle · знать");
-
-    if (p >= 75) push(known, c.middle.can, "Middle · уметь");
-    else push(gaps, c.middle.can, "Middle · уметь");
-
-    if (p >= 90) push(known, c.senior.know, "Senior · знать");
-    else push(gaps, c.senior.know, "Senior · знать");
-
-    if (p >= 95) push(known, c.senior.can, "Senior · уметь");
-    else push(gaps, c.senior.can, "Senior · уметь");
+    items.forEach((item) => {
+        const status = evaluateSkillStatus(item.id, p);
+        const row = {
+            id: item.id,
+            text: item.text,
+            tag: item.tag,
+            status: status.state,
+            evidence: status.evidence,
+            source: status.source
+        };
+        if (status.state === "pass") known.push(row);
+        else gaps.push(row);
+    });
 
     return { known, gaps };
+}
+
+function listCompetenciesForTopic(topicName) {
+    const c = getTopicCompetencies(topicName);
+    if (!c) return [];
+    const slug = {
+        Метрики: "metrics",
+        "Финансовая модель": "finmodel",
+        "Юнит-экономика": "unit",
+        JTBD: "jtbd",
+        CustDev: "custdev"
+    }[topicName];
+    if (!slug) return [];
+
+    const out = [];
+    const push = (level, kind, tag, minPercent) => {
+        (c[level][kind] || []).forEach((text, index) => {
+            out.push({
+                id: `${slug}.${level}.${kind}.${index}`,
+                text,
+                tag,
+                level,
+                kind,
+                minPercent
+            });
+        });
+    };
+    push("middle", "know", "Middle · знать", 50);
+    push("middle", "can", "Middle · уметь", 75);
+    push("senior", "know", "Senior · знать", 90);
+    push("senior", "can", "Senior · уметь", 95);
+    return out;
+}
+
+/**
+ * Статус скила: по ответам на привязанные вопросы, иначе по порогу %.
+ */
+function evaluateSkillStatus(skillId, topicBestPercent) {
+    let minPercent = 50;
+    if (skillId.includes(".senior.can.")) minPercent = 95;
+    else if (skillId.includes(".senior.know.")) minPercent = 90;
+    else if (skillId.includes(".middle.can.")) minPercent = 75;
+
+    const qids =
+        typeof getQuestionsForSkill === "function" ? getQuestionsForSkill(skillId) : [];
+    const outcomeMap =
+        typeof getQuestionOutcomeStats === "function"
+            ? new Map(getQuestionOutcomeStats().map((r) => [Number(r.questionId), r]))
+            : new Map();
+
+    let correct = 0;
+    let wrong = 0;
+    qids.forEach((qid) => {
+        const row = outcomeMap.get(Number(qid));
+        if (!row) return;
+        correct += row.correct || 0;
+        wrong += row.wrong || 0;
+    });
+    const total = correct + wrong;
+
+    if (total > 0) {
+        const rate = correct / total;
+        return {
+            state: rate >= 0.55 ? "pass" : "fail",
+            source: "answers",
+            evidence: { correct, wrong, total, rate: Math.round(rate * 100) }
+        };
+    }
+
+    const p =
+        topicBestPercent === null || topicBestPercent === undefined
+            ? null
+            : Number(topicBestPercent);
+    if (p === null) {
+        return { state: "empty", source: "none", evidence: null };
+    }
+    return {
+        state: p >= minPercent ? "pass" : "fail",
+        source: "threshold",
+        evidence: null
+    };
 }
 
 /**
@@ -332,11 +412,33 @@ function skillColumnTag(col) {
     return `${col.label} · ${col.sub}`;
 }
 
+function skillCellStateForColumn(snapshot, col) {
+    if (snapshot.bestPercent === null) return "empty";
+    const items = [...(snapshot.known || []), ...(snapshot.gaps || [])].filter(
+        (item) => item.tag === skillColumnTag(col)
+    );
+    if (!items.length) return skillCellState(snapshot.bestPercent, col.minPercent);
+
+    // Все скилы колонки: и по ответам, и по порогу %
+    const scored = items.filter((item) => item.status === "pass" || item.status === "fail");
+    if (!scored.length) return skillCellState(snapshot.bestPercent, col.minPercent);
+    const passed = scored.filter((item) => item.status === "pass").length;
+    return passed / scored.length >= 0.5 ? "pass" : "fail";
+}
+
 function skillsForColumn(snapshot, col) {
     const tag = skillColumnTag(col);
-    const pool =
-        skillCellState(snapshot.bestPercent, col.minPercent) === "pass" ? snapshot.known : snapshot.gaps;
-    return (pool || []).filter((item) => item.tag === tag).map((item) => item.text);
+    const pool = [...(snapshot.known || []), ...(snapshot.gaps || [])].filter(
+        (item) => item.tag === tag
+    );
+    return pool.map((item) => {
+        const mark = item.status === "pass" ? "✓" : "✗";
+        const via =
+            item.source === "answers" && item.evidence
+                ? ` (${item.evidence.correct}/${item.evidence.total})`
+                : "";
+        return `${mark} ${item.text}${via}`;
+    });
 }
 
 /**
@@ -381,7 +483,13 @@ function renderSkillItemsList(items, emptyText) {
                 `<p class="level-col-label">${escapeHtml(currentTag)}</p><ul class="level-list grade-skill-list">`
             );
         }
-        parts.push(`<li>${escapeHtml(item.text)}</li>`);
+        const via =
+            item.source === "answers" && item.evidence
+                ? `<span class="skill-evidence"> · ответы ${item.evidence.correct}/${item.evidence.total}</span>`
+                : item.source === "threshold"
+                  ? `<span class="skill-evidence"> · по порогу %</span>`
+                  : "";
+        parts.push(`<li>${escapeHtml(item.text)}${via}</li>`);
     });
     if (currentTag !== null) parts.push("</ul>");
 
@@ -426,7 +534,7 @@ function renderSkillMatrixHtml(snapshots) {
             const topicId = s.topic.id || s.topic.name;
 
             const cells = SKILL_COLUMNS.map((col) => {
-                const state = skillCellState(s.bestPercent, col.minPercent);
+                const state = skillCellStateForColumn(s, col);
                 if (state === "empty") {
                     return `<td class="skills-cell skills-cell-empty">—</td>`;
                 }
@@ -574,8 +682,9 @@ function renderGradesSectionHtml() {
         <div class="grades-intro">
             <p>
                 Слева — знания по темам, справа — уровни (знать / уметь).
-                В ячейках: <strong>✓ закрыто</strong> / <strong>✗ пробел</strong> по порогу %.
-                Колонка «Лучшая попытка» — верные и ошибки только из лучшего квиза темы.
+                В ячейках: <strong>✓ закрыто</strong> / <strong>✗ пробел</strong> —
+                сначала по ответам на вопросы, привязанные к скилу; если ответов ещё нет — по порогу %.
+                Колонка «Лучшая попытка» — верные и ошибки из лучшего квиза темы.
                 Общий уровень = среднее лучших % по <strong>всем</strong> темам (непройденные = 0%).
             </p>
             ${renderSkillsLegendHtml()}
@@ -626,5 +735,95 @@ function assessTopicLevel(topicName, percent, options = {}) {
         : `По теме «${topicName}» ориентир: ${level.shortLabel} (${percent}%).`;
 
     return { level, topicName, isMistakes, summary };
+}
+
+/**
+ * Подборка «что учить дальше» после раунда.
+ */
+function buildLearnNextRecommendation({ topic, percent, wrongAnswers = [], quizType }) {
+    const skills = [];
+    const seen = new Set();
+
+    wrongAnswers.forEach((w) => {
+        const ids = typeof getSkillsForQuestion === "function" ? getSkillsForQuestion(w.id) : [];
+        ids.forEach((sid) => {
+            if (seen.has(sid)) return;
+            seen.add(sid);
+            const skill = typeof getSkillById === "function" ? getSkillById(sid) : null;
+            if (skill) {
+                const tag = `${skill.level === "senior" ? "Senior" : "Middle"} · ${
+                    skill.kind === "can" ? "уметь" : "знать"
+                }`;
+                skills.push({ ...skill, tag });
+            }
+        });
+    });
+
+    const topicName = quizType === "mistakes" ? null : topic;
+    const split =
+        topicName && percent != null
+            ? splitCompetenciesByPercent(topicName, percent)
+            : { known: [], gaps: [] };
+
+    const gapExtras = (split.gaps || [])
+        .filter((g) => !seen.has(g.id))
+        .slice(0, 3);
+
+    const focusSkills = [
+        ...skills.slice(0, 4),
+        ...gapExtras.map((g) => ({ id: g.id, text: g.text, tag: g.tag }))
+    ].slice(0, 5);
+
+    const topicsFromWrongs = [...new Set(wrongAnswers.map((w) => w.topic).filter(Boolean))];
+    const cheatTopic = topicName || topicsFromWrongs[0] || null;
+    const bullets =
+        cheatTopic && typeof getCheatSheetBullets === "function"
+            ? getCheatSheetBullets(cheatTopic, 4)
+            : [];
+
+    let lead;
+    if (quizType === "mistakes") {
+        lead =
+            percent === 100
+                ? "Все ошибки в раунде закрыты. Дальше — слабые скилы по таблице или другой теме."
+                : "Сфокусируйтесь на скилах ниже — по ним были ошибки в этом раунде.";
+    } else if (percent >= 80) {
+        lead = "Тема в целом закрыта. Для роста дотяните оставшиеся пробелы Senior.";
+    } else if (percent >= 50) {
+        lead = "Есть база, но нестабильна. Ниже — что учить в первую очередь.";
+    } else {
+        lead = "Сначала закройте базу Middle по пунктам ниже, затем повторите квиз.";
+    }
+
+    return { lead, focusSkills, bullets, cheatTopic, topicsFromWrongs };
+}
+
+function renderLearnNextHtml(rec) {
+    if (!rec) return "";
+    const skillLis = (rec.focusSkills || [])
+        .map(
+            (s) =>
+                `<li><span class="learn-next-tag">${escapeHtml(s.tag || "")}</span> ${escapeHtml(s.text)}</li>`
+        )
+        .join("");
+    const bulletLis = (rec.bullets || [])
+        .map((b) => `<li>${escapeHtml(b)}</li>`)
+        .join("");
+
+    return `
+        <div class="learn-next">
+            <p class="learn-next-lead">${escapeHtml(rec.lead)}</p>
+            ${
+                skillLis
+                    ? `<h4 class="learn-next-title">Скилы на подтягивание</h4><ul class="learn-next-list">${skillLis}</ul>`
+                    : ""
+            }
+            ${
+                bulletLis
+                    ? `<h4 class="learn-next-title">Шпаргалка${rec.cheatTopic ? `: ${escapeHtml(rec.cheatTopic)}` : ""}</h4><ul class="learn-next-cheats">${bulletLis}</ul>`
+                    : ""
+            }
+        </div>
+    `;
 }
 

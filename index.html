@@ -125,9 +125,17 @@
                 </section>
 
                 <section class="stats-section">
+                    <h2 class="section-title">Разборы интервью</h2>
+                    <div id="interview-history-section"></div>
+                </section>
+
+                <section class="stats-section">
                     <div class="section-header">
                         <h2 class="section-title">Последние прохождения</h2>
-                        <button class="btn-text" id="btn-clear-stats">Сбросить статистику</button>
+                        <div class="section-header-actions">
+                            <button class="btn-text" id="btn-export-csv">Экспорт CSV</button>
+                            <button class="btn-text" id="btn-clear-stats">Сбросить статистику</button>
+                        </div>
                     </div>
                     <div class="sessions-list" id="sessions-list"></div>
                 </section>
@@ -155,6 +163,7 @@
                         <h4 id="feedback-title"></h4>
                         <p id="feedback-explanation"></p>
                         <p class="feedback-example" id="feedback-example"></p>
+                        <div id="feedback-cheatsheet" class="hidden"></div>
                         <div class="feedback-actions hidden" id="feedback-actions">
                             <button class="btn btn-knowledge" id="btn-study-topic">📚 Изучить тему в базе знаний</button>
                         </div>
@@ -220,7 +229,9 @@
             <div id="interview-debrief-screen" class="hidden">
                 <div class="results-card interview-debrief-card">
                     <h2 class="results-title">Разбор интервью</h2>
+                    <p class="interview-debrief-hint hidden" id="interview-debrief-replay-hint"></p>
                     <div class="interview-debrief-content" id="interview-debrief-content"></div>
+                    <div class="interview-debrief-transcript hidden" id="interview-debrief-transcript"></div>
                     <div class="results-actions">
                         <button class="btn btn-primary" id="interview-debrief-back">Новое интервью</button>
                         <button class="btn btn-knowledge" id="interview-debrief-knowledge">📚 База знаний</button>
@@ -232,6 +243,7 @@
     </div>
 
     <script src="js/questions.js"></script>
+    <script src="js/question-skills.js"></script>
     <script src="js/config.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/knowledge.js"></script>
@@ -241,6 +253,7 @@
     <script src="js/answers.js"></script>
     <script src="js/mistakes.js"></script>
     <script src="js/interview-scenarios.js"></script>
+    <script src="js/interview-history.js"></script>
     <script src="js/interview.js"></script>
     <script src="js/app.js"></script>
 </body>

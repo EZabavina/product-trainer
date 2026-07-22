@@ -219,6 +219,15 @@ body::before {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 16px;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.section-header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 .section-header .section-title {
@@ -2196,4 +2205,135 @@ body::before {
     .question-card {
         padding: 20px;
     }
+}
+
+/* Learn next + inline cheatsheets + interview history */
+.results-recommendation-lead {
+    margin: 0 0 12px;
+}
+
+.learn-next {
+    margin-top: 4px;
+}
+
+.learn-next-lead {
+    margin: 0 0 10px;
+    color: var(--text);
+}
+
+.learn-next-title {
+    margin: 12px 0 6px;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
+.learn-next-list,
+.learn-next-cheats,
+.inline-cheatsheet-list {
+    margin: 0;
+    padding-left: 1.1rem;
+    text-align: left;
+}
+
+.learn-next-list li,
+.learn-next-cheats li,
+.inline-cheatsheet-list li {
+    margin-bottom: 4px;
+    line-height: 1.45;
+}
+
+.learn-next-tag {
+    display: inline-block;
+    font-size: 0.72rem;
+    color: var(--primary-light, #a5b4fc);
+    margin-right: 4px;
+}
+
+.inline-cheatsheet {
+    margin-top: 12px;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    background: rgba(56, 189, 248, 0.08);
+    border: 1px solid rgba(56, 189, 248, 0.18);
+    text-align: left;
+}
+
+.inline-cheatsheet-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #7dd3fc;
+}
+
+.mistake-skills {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 8px;
+}
+
+.skill-evidence {
+    color: var(--text-muted);
+    font-size: 0.85em;
+}
+
+.interview-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.interview-history-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    width: 100%;
+    text-align: left;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.03);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.interview-history-item:hover {
+    border-color: rgba(99, 102, 241, 0.45);
+    background: rgba(99, 102, 241, 0.08);
+}
+
+.interview-history-title {
+    font-weight: 600;
+}
+
+.interview-history-meta {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.interview-debrief-hint {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin: -8px 0 16px;
+}
+
+.interview-debrief-hint.is-error {
+    color: #FCA5A5;
+}
+
+.interview-debrief-transcript {
+    width: 100%;
+    margin-top: 20px;
+    text-align: left;
+    max-height: 360px;
+    overflow: auto;
+    padding-right: 4px;
+}
+
+.interview-debrief-transcript .chat-bubble {
+    margin-bottom: 10px;
 }

@@ -27,6 +27,7 @@ const feedbackIcon = document.getElementById("feedback-icon");
 const feedbackTitle = document.getElementById("feedback-title");
 const feedbackExplanation = document.getElementById("feedback-explanation");
 const feedbackExample = document.getElementById("feedback-example");
+const feedbackCheatsheet = document.getElementById("feedback-cheatsheet");
 const feedbackActions = document.getElementById("feedback-actions");
 const btnStudyTopic = document.getElementById("btn-study-topic");
 const btnBack = document.getElementById("btn-back");
@@ -34,6 +35,8 @@ const btnNext = document.getElementById("btn-next");
 const btnRestart = document.getElementById("btn-restart");
 const btnHome = document.getElementById("btn-home");
 const btnClearStats = document.getElementById("btn-clear-stats");
+const btnExportCsv = document.getElementById("btn-export-csv");
+const interviewHistorySection = document.getElementById("interview-history-section");
 const resultsTopic = document.getElementById("results-topic");
 const resultsScore = document.getElementById("results-score");
 const resultsDetail = document.getElementById("results-detail");
@@ -529,6 +532,17 @@ function renderStatsView() {
         hardestQuestionsSection.innerHTML = renderHardestQuestionsHtml(10);
     }
 
+    if (interviewHistorySection && typeof renderInterviewHistoryHtml === "function") {
+        interviewHistorySection.innerHTML = renderInterviewHistoryHtml();
+        interviewHistorySection.querySelectorAll("[data-interview-id]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                if (typeof replayInterviewRecord === "function") {
+                    replayInterviewRecord(btn.getAttribute("data-interview-id"));
+                }
+            });
+        });
+    }
+
     const activity = getActivityDays(14);
     const maxCount = Math.max(...activity.map((d) => d.count), 1);
 
@@ -880,6 +894,10 @@ function renderQuestion() {
 
     feedback.classList.remove("visible", "correct", "wrong");
     feedbackActions.classList.add("hidden");
+    if (feedbackCheatsheet) {
+        feedbackCheatsheet.innerHTML = "";
+        feedbackCheatsheet.classList.add("hidden");
+    }
     btnNext.classList.add("hidden");
 }
 
@@ -921,6 +939,16 @@ function selectAnswer(selectedIndex) {
     feedbackExplanation.textContent = q.explanation;
     feedbackExample.textContent = q.example ? `Пример: ${q.example}` : "";
 
+    if (feedbackCheatsheet) {
+        if (!isCorrect && typeof formatCheatSheetHtml === "function") {
+            feedbackCheatsheet.innerHTML = formatCheatSheetHtml(q.topic, 4);
+            feedbackCheatsheet.classList.toggle("hidden", !feedbackCheatsheet.innerHTML.trim());
+        } else {
+            feedbackCheatsheet.innerHTML = "";
+            feedbackCheatsheet.classList.add("hidden");
+        }
+    }
+
     if (!isCorrect) {
         wrongAnswers.push({
             id: q.id,
@@ -954,8 +982,17 @@ function renderMistakesReview() {
 
     resultsMistakes.classList.remove("hidden");
     resultsMistakesList.innerHTML = wrongAnswers
-        .map(
-            (w, i) => `
+        .map((w, i) => {
+            const skillIds =
+                typeof getSkillsForQuestion === "function" ? getSkillsForQuestion(w.id) : [];
+            const skillLabels = skillIds
+                .map((id) => (typeof getSkillById === "function" ? getSkillById(id) : null))
+                .filter(Boolean)
+                .map((s) => s.text)
+                .slice(0, 2);
+            const cheat =
+                typeof formatCheatSheetHtml === "function" ? formatCheatSheetHtml(w.topic, 4) : "";
+            return `
         <article class="mistake-item">
             <div class="mistake-header">
                 <span class="mistake-num">${i + 1}</span>
@@ -972,10 +1009,16 @@ function renderMistakesReview() {
                 </div>
                 <div class="mistake-explanation">${escapeHtml(w.explanation)}</div>
                 ${w.example ? `<div class="mistake-example">Пример: ${escapeHtml(w.example)}</div>` : ""}
+                ${
+                    skillLabels.length
+                        ? `<div class="mistake-skills">Скилы: ${skillLabels.map((t) => escapeHtml(t)).join(" · ")}</div>`
+                        : ""
+                }
+                ${cheat}
             </div>
         </article>
-    `
-        )
+    `;
+        })
         .join("");
 
     resultsKnowledge.classList.remove("hidden");
@@ -1066,7 +1109,21 @@ function showResults() {
     } else {
         recommendation = "Стоит вернуться к теории. Обратите внимание на примеры в объяснениях — они помогут запомнить.";
     }
-    resultsRecommendation.textContent = recommendation;
+
+    if (typeof buildLearnNextRecommendation === "function" && typeof renderLearnNextHtml === "function") {
+        const learnNext = buildLearnNextRecommendation({
+            topic: currentTopic,
+            percent,
+            wrongAnswers,
+            quizType: currentQuizType
+        });
+        resultsRecommendation.innerHTML = `
+            <p class="results-recommendation-lead">${escapeHtml(recommendation)}</p>
+            ${renderLearnNextHtml(learnNext)}
+        `;
+    } else {
+        resultsRecommendation.textContent = recommendation;
+    }
 
     renderMistakesReview();
     updateResultsMistakesButton();
@@ -1117,7 +1174,11 @@ quizSetupClose.addEventListener("click", closeQuizSetup);
 setupStart.addEventListener("click", startQuizFromSetup);
 
 btnClearStats.addEventListener("click", () => {
-    if (confirm("Удалить всю статистику, журнал ответов и банк ошибок? Это действие нельзя отменить.")) {
+    if (
+        confirm(
+            "Удалить всю статистику, журнал ответов, банк ошибок и разборы интервью? Это действие нельзя отменить."
+        )
+    ) {
         clearStats();
         clearAllMistakes();
         if (typeof clearAnswerLog === "function") clearAnswerLog();
@@ -1126,5 +1187,16 @@ btnClearStats.addEventListener("click", () => {
         renderTopics();
     }
 });
+
+if (btnExportCsv) {
+    btnExportCsv.addEventListener("click", () => {
+        if (typeof exportProgressCsv !== "function") return;
+        const result = exportProgressCsv();
+        btnExportCsv.textContent = `Экспорт ✓ (${result.sessions} сесс.)`;
+        setTimeout(() => {
+            btnExportCsv.textContent = "Экспорт CSV";
+        }, 2000);
+    });
+}
 
 showMainView("train");
