@@ -36,7 +36,7 @@ cp .env.example .env   # вставьте OPENROUTER_API_KEY
 npm run dev            # http://localhost:8080 + /api/interview
 ```
 
-Деплой симулятора: [Vercel](https://vercel.com) — добавьте `OPENROUTER_API_KEY` в Environment Variables. GitHub Pages поддерживает только квиз без AI.
+Деплой симулятора: [Vercel](https://vercel.com) — подключите репозиторий `EZabavina/product-trainer`, Framework Preset: **Other**, добавьте `OPENROUTER_API_KEY` в Environment Variables (Production + Preview). После деплоя квиз и AI-симулятор работают на одном URL. GitHub Pages — только квиз без AI.
 
 Перейдите на `http://localhost:8080`.
 
