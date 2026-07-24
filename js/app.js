@@ -761,10 +761,18 @@ function showMainView(view) {
         renderOverviewStrip();
         renderTopics();
     } else if (view === "stats") {
-        statsView.classList.remove("hidden");
-        renderStatsView();
+        // Цель до render — иначе ошибка в статистике глушит reachGoal
         if (typeof trackMetrika === "function") {
             trackMetrika("view_stats");
+        }
+        if (typeof trackMetrikaHit === "function") {
+            trackMetrikaHit(location.pathname + "#stats");
+        }
+        statsView.classList.remove("hidden");
+        try {
+            renderStatsView();
+        } catch (err) {
+            console.error("renderStatsView failed:", err);
         }
     } else if (view === "knowledge") {
         knowledgeView.classList.remove("hidden");
