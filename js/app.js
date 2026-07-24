@@ -123,6 +123,10 @@ function isInterviewMode(topicName, modeId) {
     return getModeConfig(topicName, modeId)?.type === "interview";
 }
 
+function isCalcMode(topicName, modeId) {
+    return getModeConfig(topicName, modeId)?.type === "calc";
+}
+
 function isQuizModeAll(topicName, modeId) {
     const mode = getModeConfig(topicName, modeId);
     return mode?.type === "quiz";
@@ -135,6 +139,9 @@ function getTopicCountText(topicName) {
             .map((m) => {
                 if (m.type === "interview") {
                     return `${getInterviewScenarioCount()} сценариев`;
+                }
+                if (m.type === "calc") {
+                    return `${getUnitCalcScenarioCount()} расчётов`;
                 }
                 if (m.type === "quiz") {
                     return `${getQuestionCount(topicName)} вопросов`;
@@ -149,6 +156,9 @@ function getTopicCountText(topicName) {
 function getModeCountLabel(topicName, mode) {
     if (mode.type === "interview") {
         return `${getInterviewScenarioCount()} сценариев`;
+    }
+    if (mode.type === "calc") {
+        return `${getUnitCalcScenarioCount()} заданий`;
     }
     if (mode.type === "quiz") {
         return `${getQuestionCount(topicName)} вопросов в базе`;
@@ -359,6 +369,8 @@ function renderQuizSetup() {
     const isInterview =
         pendingSetup.kind === "topic" &&
         isInterviewMode(pendingSetup.topic, pendingSetup.mode);
+    const isCalc =
+        pendingSetup.kind === "topic" && isCalcMode(pendingSetup.topic, pendingSetup.mode);
 
     setupLengthSection.classList.toggle("hidden", isInterview);
     setupScenarioSection.classList.toggle("hidden", !isInterview);
@@ -368,6 +380,11 @@ function renderQuizSetup() {
         setupStart.textContent = pendingSetup.scenarioId
             ? "Начать интервью"
             : "Выберите сценарий";
+    } else if (isCalc) {
+        const n = getSessionSize(getUnitCalcScenarioCount(), pendingSetup.length || "standard");
+        setupStart.disabled = getUnitCalcScenarioCount() === 0;
+        setupStart.textContent =
+            getUnitCalcScenarioCount() === 0 ? "Нет заданий" : `Начать · ${n} заданий`;
     } else {
         setupStart.disabled = getSetupPool().length === 0;
         setupStart.textContent =
@@ -436,6 +453,10 @@ function getSetupPool() {
         return getMistakeQuestions(pendingSetup.filter);
     }
 
+    if (isCalcMode(pendingSetup.topic, pendingSetup.mode)) {
+        return typeof UNIT_CALC_SCENARIOS !== "undefined" ? UNIT_CALC_SCENARIOS : [];
+    }
+
     let pool = QUESTIONS.filter((q) => q.topic === pendingSetup.topic);
     const cfg = getTopicConfig(pendingSetup.topic);
     if (cfg.modes?.length && pendingSetup.mode) {
@@ -469,6 +490,16 @@ function startQuizFromSetup() {
         const scenarioId = pendingSetup.scenarioId;
         closeQuizSetup();
         startInterview(scenarioId);
+        return;
+    }
+
+    if (
+        pendingSetup.kind === "topic" &&
+        isCalcMode(pendingSetup.topic, pendingSetup.mode)
+    ) {
+        const length = pendingSetup.length || "standard";
+        closeQuizSetup();
+        startUnitCalc(length);
         return;
     }
 
@@ -726,6 +757,11 @@ function goHome() {
         closeInterview();
     }
 
+    if (typeof isUnitCalcActive === "function" && isUnitCalcActive()) {
+        if (!confirmLeaveUnitCalc()) return;
+        closeUnitCalc();
+    }
+
     navigateWithTransition(() => {
         showMainView("train");
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -744,11 +780,13 @@ function setNavVisible(visible) {
 function showMainView(view) {
     closeQuizSetup();
     if (typeof closeInterview === "function") closeInterview();
+    if (typeof closeUnitCalc === "function") closeUnitCalc();
     trainView.classList.add("hidden");
     statsView.classList.add("hidden");
     knowledgeView.classList.add("hidden");
     quizScreen.classList.add("hidden");
     resultsScreen.classList.add("hidden");
+    document.getElementById("unit-calc-screen")?.classList.add("hidden");
     setNavVisible(true);
 
     document.querySelectorAll(".nav-tab").forEach((tab) => {
@@ -842,6 +880,12 @@ function updateQuizBadge() {
 }
 
 function restartQuiz() {
+    if (currentQuizType === "unit-calc") {
+        document.getElementById("results-screen")?.classList.add("hidden");
+        startUnitCalc(currentSessionLength || "standard");
+        return;
+    }
+
     if (currentQuizType === "mistakes") {
         const pool = getMistakeQuestions(currentMistakeFilter);
         if (pool.length === 0) {

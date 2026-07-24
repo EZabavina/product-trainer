@@ -160,14 +160,28 @@ function getHardestQuestions(limit = 10, minAttempts = 2) {
         (typeof QUESTIONS !== "undefined" ? QUESTIONS : []).map((q) => [q.id, q])
     );
 
+    const calcById = new Map(
+        (typeof UNIT_CALC_SCENARIOS !== "undefined" ? UNIT_CALC_SCENARIOS : []).map((s) => [
+            `unit-calc:${s.id}`,
+            s
+        ])
+    );
+
     return getQuestionOutcomeStats()
         .filter((row) => row.attempts >= minAttempts && row.wrong > 0)
         .map((row) => {
             const q = qById.get(row.questionId);
+            const calc = calcById.get(String(row.questionId));
+            let question = q?.question || null;
+            if (!question && calc) {
+                question = `Расчёт: ${calc.title}`;
+            }
+            if (!question) question = `Вопрос #${row.questionId}`;
+
             return {
                 ...row,
-                question: q?.question || `Вопрос #${row.questionId}`,
-                topic: row.topic || q?.topic || "—"
+                question,
+                topic: row.topic || q?.topic || (calc ? "Юнит-экономика" : "—")
             };
         })
         .sort((a, b) => {

@@ -2337,3 +2337,157 @@ body::before {
 .interview-debrief-transcript .chat-bubble {
     margin-bottom: 10px;
 }
+
+/* Unit economics calculator */
+.uc-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    max-width: 820px;
+    margin: 0 auto;
+}
+
+.uc-title {
+    font-size: 1.25rem;
+    margin: 0 0 8px;
+}
+
+.uc-brief {
+    color: var(--text-muted);
+    margin: 0 0 8px;
+    line-height: 1.5;
+}
+
+.uc-sheet-hint {
+    font-size: 0.8rem;
+    color: #c4b5fd;
+    margin: 0 0 18px;
+}
+
+.uc-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 16px;
+}
+
+.uc-panel {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+}
+
+.uc-panel-ask {
+    border-color: rgba(139, 92, 246, 0.35);
+    background: rgba(139, 92, 246, 0.08);
+}
+
+.uc-panel-title {
+    margin: 0 0 12px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+.uc-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.uc-metric {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.uc-metric-label {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.uc-metric-value {
+    font-weight: 600;
+    font-size: 1.05rem;
+}
+
+.uc-input {
+    font: inherit;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--text);
+}
+
+.uc-input:focus {
+    outline: none;
+    border-color: #8b5cf6;
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+}
+
+.uc-input-ok {
+    border-color: #10b981 !important;
+}
+
+.uc-input-bad {
+    border-color: #ef4444 !important;
+}
+
+.uc-feedback {
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    margin-bottom: 14px;
+    text-align: left;
+}
+
+.uc-feedback-ok {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.uc-feedback-bad {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.uc-feedback-title {
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.uc-feedback-list {
+    margin: 0;
+    padding-left: 1.1rem;
+}
+
+.uc-feedback-list li {
+    margin-bottom: 8px;
+}
+
+.uc-formula {
+    font-size: 0.85rem;
+    color: #c4b5fd;
+    margin-top: 4px;
+}
+
+.uc-hint {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.uc-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 700px) {
+    .uc-columns {
+        grid-template-columns: 1fr;
+    }
+}

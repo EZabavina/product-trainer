@@ -1,0 +1,348 @@
+/** Generated from data/unit-calc-scenarios.json — node scripts/build-unit-calc.mjs */
+const UNIT_CALC_SCENARIOS = [
+    {
+        "id": "uc1",
+        "title": "Число платящих",
+        "brief": "Food delivery. Считаем, сколько платящих получим из потока.",
+        "icon": "👥",
+        "given": [
+            {
+                "key": "users",
+                "label": "Поток пользователей",
+                "value": 50000,
+                "unit": ""
+            },
+            {
+                "key": "c1",
+                "label": "Конверсия в 1-ю покупку (C1)",
+                "value": 0.1,
+                "unit": "%",
+                "display": "10%"
+            }
+        ],
+        "ask": [
+            {
+                "key": "buyers",
+                "label": "Число платящих (Buyers)",
+                "formula": "Buyers = Users × C1",
+                "answer": 5000,
+                "hint": "50 000 × 10% = 5 000"
+            }
+        ],
+        "sheetHint": "Колонки: поток → C1 → Buyers"
+    },
+    {
+        "id": "uc2",
+        "title": "ARPPU / LTV платящего",
+        "brief": "Средний чек 600 ₽, комиссия/COGS 5%, в среднем 1,2 покупки на платящего.",
+        "icon": "💵",
+        "given": [
+            {
+                "key": "avPrice",
+                "label": "Средний чек (AvPrice)",
+                "value": 600,
+                "unit": "₽"
+            },
+            {
+                "key": "cogsPct",
+                "label": "COGS / комиссия",
+                "value": 0.05,
+                "unit": "%",
+                "display": "5%"
+            },
+            {
+                "key": "lifetime",
+                "label": "Число покупок (Lifetime)",
+                "value": 1.2,
+                "unit": ""
+            }
+        ],
+        "ask": [
+            {
+                "key": "arppu",
+                "label": "ARPPU / LTV платящего, ₽",
+                "formula": "ARPPU = AvPrice × (1 − COGS) × Lifetime",
+                "answer": 684,
+                "hint": "600 × 0,95 × 1,2 = 684"
+            }
+        ],
+        "sheetHint": "Доход на 1-го платящего (AMPPU / ARPPU / CLTV)"
+    },
+    {
+        "id": "uc3",
+        "title": "CAC платящего",
+        "brief": "На paid-канал потратили 100 000 ₽ и привлекли 1 000 платящих.",
+        "icon": "🎯",
+        "given": [
+            {
+                "key": "spend",
+                "label": "Расход на привлечение",
+                "value": 100000,
+                "unit": "₽"
+            },
+            {
+                "key": "buyers",
+                "label": "Платящие",
+                "value": 1000,
+                "unit": ""
+            }
+        ],
+        "ask": [
+            {
+                "key": "cac",
+                "label": "CAC платящего, ₽",
+                "formula": "CAC = Spend / Buyers",
+                "answer": 100,
+                "hint": "100 000 / 1 000 = 100"
+            }
+        ],
+        "sheetHint": "CAC, Customer Acquisition Costs"
+    },
+    {
+        "id": "uc4",
+        "title": "ARPU с привлечённого",
+        "brief": "ARPPU = 684 ₽, конверсия в покупку C1 = 10%. Сколько в среднем приносит один привлечённый пользователь?",
+        "icon": "📉",
+        "given": [
+            {
+                "key": "arppu",
+                "label": "ARPPU",
+                "value": 684,
+                "unit": "₽"
+            },
+            {
+                "key": "c1",
+                "label": "C1",
+                "value": 0.1,
+                "unit": "%",
+                "display": "10%"
+            }
+        ],
+        "ask": [
+            {
+                "key": "arpu",
+                "label": "ARPU / LTV на привлечённого, ₽",
+                "formula": "ARPU = ARPPU × C1",
+                "answer": 68.4,
+                "hint": "684 × 10% = 68,4"
+            }
+        ],
+        "sheetHint": "Доход на 1-го привлеченного (ARPU or LTV)"
+    },
+    {
+        "id": "uc5",
+        "title": "Сходится ли юнит? LTV/CAC",
+        "brief": "LTV платящего 684 ₽, CAC 100 ₽. Посчитайте LTV/CAC.",
+        "icon": "⚖️",
+        "given": [
+            {
+                "key": "ltv",
+                "label": "LTV / ARPPU",
+                "value": 684,
+                "unit": "₽"
+            },
+            {
+                "key": "cac",
+                "label": "CAC",
+                "value": 100,
+                "unit": "₽"
+            }
+        ],
+        "ask": [
+            {
+                "key": "ratio",
+                "label": "LTV / CAC",
+                "formula": "LTV/CAC = LTV ÷ CAC",
+                "answer": 6.84,
+                "hint": "684 / 100 = 6,84 — юнит сходится с запасом"
+            }
+        ],
+        "sheetHint": "Ориентир: здоровый юнит часто ≥ 3"
+    },
+    {
+        "id": "uc6",
+        "title": "Payback в месяцах",
+        "brief": "CAC = 600 ₽. Маржа с платящего в месяц (contribution) = 150 ₽. За сколько месяцев окупится CAC?",
+        "icon": "⏳",
+        "given": [
+            {
+                "key": "cac",
+                "label": "CAC",
+                "value": 600,
+                "unit": "₽"
+            },
+            {
+                "key": "marginMonth",
+                "label": "Маржа / мес. с платящего",
+                "value": 150,
+                "unit": "₽"
+            }
+        ],
+        "ask": [
+            {
+                "key": "payback",
+                "label": "Payback, мес.",
+                "formula": "Payback = CAC / Monthly margin",
+                "answer": 4,
+                "hint": "600 / 150 = 4 месяца"
+            }
+        ],
+        "sheetHint": "Скорость возврата инвестиций в привлечение"
+    },
+    {
+        "id": "uc7",
+        "title": "Blended CAC врёт",
+        "brief": "Paid: 10 000 юзеров, spend 100 000 ₽, C1=10%. Free: 40 000 юзеров, spend 0, C1=10%. Посчитайте blended CAC на платящего и CAC только paid.",
+        "icon": "🔀",
+        "given": [
+            {
+                "key": "paidUsers",
+                "label": "Paid пользователи",
+                "value": 10000,
+                "unit": ""
+            },
+            {
+                "key": "freeUsers",
+                "label": "Free пользователи",
+                "value": 40000,
+                "unit": ""
+            },
+            {
+                "key": "spend",
+                "label": "Spend paid",
+                "value": 100000,
+                "unit": "₽"
+            },
+            {
+                "key": "c1",
+                "label": "C1",
+                "value": 0.1,
+                "unit": "%",
+                "display": "10%"
+            }
+        ],
+        "ask": [
+            {
+                "key": "cacPaid",
+                "label": "CAC paid (на платящего), ₽",
+                "formula": "CAC_paid = Spend / (PaidUsers × C1)",
+                "answer": 100,
+                "hint": "100 000 / 1 000 = 100"
+            },
+            {
+                "key": "cacBlended",
+                "label": "Blended CAC (на платящего), ₽",
+                "formula": "CAC_blended = Spend / ((Paid+Free) × C1)",
+                "answer": 20,
+                "hint": "100 000 / 5 000 = 20 — выглядит «красиво», но paid убыточнее"
+            }
+        ],
+        "sheetHint": "Строки paid / free / все пользователи в вашей таблице"
+    },
+    {
+        "id": "uc8",
+        "title": "Прибыль на привлечённого",
+        "brief": "ARPU = 68,4 ₽, CPA (стоимость привлечения пользователя) = 10 ₽. Сколько прибыли с одного привлечённого?",
+        "icon": "➕",
+        "given": [
+            {
+                "key": "arpu",
+                "label": "ARPU",
+                "value": 68.4,
+                "unit": "₽"
+            },
+            {
+                "key": "cpa",
+                "label": "CPA / CPUser",
+                "value": 10,
+                "unit": "₽"
+            }
+        ],
+        "ask": [
+            {
+                "key": "profitPerUser",
+                "label": "ARPU − CPA, ₽",
+                "formula": "Profit per acquired = ARPU − CPA",
+                "answer": 58.4,
+                "hint": "68,4 − 10 = 58,4"
+            }
+        ],
+        "sheetHint": "Колонка ARPU−CPA в таблице"
+    },
+    {
+        "id": "uc9",
+        "title": "ROI привлечения",
+        "brief": "На поток потратили 80 000 ₽. Валовая прибыль с потока после COGS = 240 000 ₽. Какой ROI?",
+        "icon": "📈",
+        "given": [
+            {
+                "key": "profit",
+                "label": "Gross Profit с потока",
+                "value": 240000,
+                "unit": "₽"
+            },
+            {
+                "key": "spend",
+                "label": "Acq Costs",
+                "value": 80000,
+                "unit": "₽"
+            }
+        ],
+        "ask": [
+            {
+                "key": "roi",
+                "label": "ROI (доля, не %)",
+                "formula": "ROI = (Profit − Spend) / Spend",
+                "answer": 2,
+                "hint": "(240 000 − 80 000) / 80 000 = 2 → 200%"
+            }
+        ],
+        "sheetHint": "Возврат на инвестиции в привлеч. пользователей"
+    },
+    {
+        "id": "uc10",
+        "title": "Какой рычаг сильнее?",
+        "brief": "База: Users=10 000, C1=10%, ARPPU=360, CAC на платящего=100. Считаем прибыль на платящего = ARPPU − CAC. Сравните три сценария — введите прибыль на платящего для лучшего рычага (макс. значение).",
+        "icon": "🦾",
+        "given": [
+            {
+                "key": "base",
+                "label": "База: ARPPU−CAC",
+                "value": 260,
+                "unit": "₽",
+                "display": "360 − 100 = 260"
+            },
+            {
+                "key": "a",
+                "label": "A) C1 ×3 (эффект на unit платящего тот же)",
+                "value": 260,
+                "unit": "₽",
+                "display": "260 (юнит платящего не меняется)"
+            },
+            {
+                "key": "b",
+                "label": "B) CAC −50%",
+                "value": 310,
+                "unit": "₽",
+                "display": "360 − 50 = 310"
+            },
+            {
+                "key": "c",
+                "label": "C) ARPPU +50%",
+                "value": 440,
+                "unit": "₽",
+                "display": "540 − 100 = 440"
+            }
+        ],
+        "ask": [
+            {
+                "key": "bestProfit",
+                "label": "Лучшая прибыль на платящего, ₽",
+                "formula": "Сравниваем B и C: рост ARPPU сильнее режет CAC в этом примере",
+                "answer": 440,
+                "hint": "Максимум у C: 440 ₽. (C1 масштабирует объём, но не юнит платящего.)"
+            }
+        ],
+        "sheetHint": "Сценарии «конв. увеличить» / «допродавать» / «снизить CAC»"
+    }
+];

@@ -331,6 +331,7 @@ function getTopicQuizSessions(topicName) {
             s.topic === topicName &&
             s.quizType !== "interview" &&
             s.quizType !== "mistakes" &&
+            s.quizType !== "unit-calc" &&
             typeof s.score === "number" &&
             typeof s.total === "number"
     );

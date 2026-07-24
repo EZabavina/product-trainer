@@ -33,7 +33,23 @@ const TOPIC_CONFIG = [
         "name": "Юнит-экономика",
         "icon": "⚖️",
         "color": "#8B5CF6",
-        "description": "CAC, LTV, маржинальность, payback"
+        "description": "CAC, LTV, маржинальность, payback",
+        "modes": [
+            {
+                "id": "quiz",
+                "label": "Квиз",
+                "icon": "📋",
+                "type": "quiz",
+                "description": "50 вопросов по теории юнит-экономики"
+            },
+            {
+                "id": "calc",
+                "label": "Расчёты",
+                "icon": "🧮",
+                "type": "calc",
+                "description": "10 заданий: посчитай Buyers, CAC, ARPU, ROI"
+            }
+        ]
     },
     {
         "id": "jtbd",
