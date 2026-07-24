@@ -132,29 +132,62 @@ const UNIT_CALC_SCENARIOS = [
     {
         "id": "uc5",
         "title": "Сходится ли юнит? LTV/CAC",
-        "brief": "LTV платящего 684 ₽, CAC 100 ₽. Посчитайте LTV/CAC.",
+        "brief": "Чек 600 ₽, COGS 5%, lifetime 1,2 покупки. На привлечение 1 000 платящих потратили 100 000 ₽. Сначала соберите LTV платящего и CAC, затем LTV/CAC.",
         "icon": "⚖️",
         "given": [
             {
-                "key": "ltv",
-                "label": "LTV / ARPPU",
-                "value": 684,
+                "key": "avPrice",
+                "label": "Средний чек (AvPrice)",
+                "value": 600,
                 "unit": "₽"
             },
             {
-                "key": "cac",
-                "label": "CAC",
-                "value": 100,
+                "key": "cogsPct",
+                "label": "COGS / комиссия",
+                "value": 0.05,
+                "unit": "%",
+                "display": "5%"
+            },
+            {
+                "key": "lifetime",
+                "label": "Число покупок (Lifetime)",
+                "value": 1.2,
+                "unit": ""
+            },
+            {
+                "key": "spend",
+                "label": "Расход на привлечение",
+                "value": 100000,
                 "unit": "₽"
+            },
+            {
+                "key": "buyers",
+                "label": "Платящие",
+                "value": 1000,
+                "unit": ""
             }
         ],
         "ask": [
+            {
+                "key": "ltv",
+                "label": "LTV платящего (ARPPU), ₽",
+                "formula": "LTV = AvPrice × (1 − COGS) × Lifetime",
+                "answer": 684,
+                "hint": "600 × 0,95 × 1,2 = 684"
+            },
+            {
+                "key": "cac",
+                "label": "CAC, ₽",
+                "formula": "CAC = Spend / Buyers",
+                "answer": 100,
+                "hint": "100 000 / 1 000 = 100"
+            },
             {
                 "key": "ratio",
                 "label": "LTV / CAC",
                 "formula": "LTV/CAC = LTV ÷ CAC",
                 "answer": 6.84,
-                "hint": "684 / 100 = 6,84 — юнит сходится с запасом"
+                "hint": "684 / 100 = 6,84 — юнит сходится (≥ 3)"
             }
         ],
         "sheetHint": "Ориентир: здоровый юнит часто ≥ 3"
@@ -302,47 +335,64 @@ const UNIT_CALC_SCENARIOS = [
     {
         "id": "uc10",
         "title": "Какой рычаг сильнее?",
-        "brief": "База: Users=10 000, C1=10%, ARPPU=360, CAC на платящего=100. Считаем прибыль на платящего = ARPPU − CAC. Сравните три сценария — введите прибыль на платящего для лучшего рычага (макс. значение).",
+        "brief": "Сравниваем юнит платящего после привлечения: Contribution LTV − CAC. База: маржинальный LTV платящего 360 ₽, CAC 100 ₽. A) только C1 ×3. B) CAC снижаем до 50 ₽. C) LTV поднимаем до 540 ₽. Посчитайте юнит в каждом сценарии.",
         "icon": "🦾",
         "given": [
             {
-                "key": "base",
-                "label": "База: ARPPU−CAC",
-                "value": 260,
-                "unit": "₽",
-                "display": "360 − 100 = 260"
+                "key": "ltvBase",
+                "label": "База: Contribution LTV платящего",
+                "value": 360,
+                "unit": "₽"
             },
             {
-                "key": "a",
-                "label": "A) C1 ×3 (эффект на unit платящего тот же)",
-                "value": 260,
-                "unit": "₽",
-                "display": "260 (юнит платящего не меняется)"
+                "key": "cacBase",
+                "label": "База: CAC",
+                "value": 100,
+                "unit": "₽"
             },
             {
-                "key": "b",
-                "label": "B) CAC −50%",
-                "value": 310,
-                "unit": "₽",
-                "display": "360 − 50 = 310"
+                "key": "cacB",
+                "label": "Сценарий B: новый CAC",
+                "value": 50,
+                "unit": "₽"
             },
             {
-                "key": "c",
-                "label": "C) ARPPU +50%",
-                "value": 440,
-                "unit": "₽",
-                "display": "540 − 100 = 440"
+                "key": "ltvC",
+                "label": "Сценарий C: новый LTV",
+                "value": 540,
+                "unit": "₽"
+            },
+            {
+                "key": "noteA",
+                "label": "Сценарий A",
+                "value": 0,
+                "unit": "",
+                "display": "C1 ×3 — юнит платящего не меняет"
             }
         ],
         "ask": [
             {
-                "key": "bestProfit",
-                "label": "Лучшая прибыль на платящего, ₽",
-                "formula": "Сравниваем B и C: рост ARPPU сильнее режет CAC в этом примере",
+                "key": "unitA",
+                "label": "A) LTV − CAC, ₽",
+                "formula": "C1 меняет объём, не юнит платящего → как база: 360 − 100",
+                "answer": 260,
+                "hint": "360 − 100 = 260"
+            },
+            {
+                "key": "unitB",
+                "label": "B) LTV − CAC, ₽",
+                "formula": "LTV − CAC = 360 − 50",
+                "answer": 310,
+                "hint": "360 − 50 = 310"
+            },
+            {
+                "key": "unitC",
+                "label": "C) LTV − CAC, ₽",
+                "formula": "LTV − CAC = 540 − 100",
                 "answer": 440,
-                "hint": "Максимум у C: 440 ₽. (C1 масштабирует объём, но не юнит платящего.)"
+                "hint": "540 − 100 = 440 — самый сильный рычаг здесь"
             }
         ],
-        "sheetHint": "Сценарии «конв. увеличить» / «допродавать» / «снизить CAC»"
+        "sheetHint": "Сравнивайте Contribution LTV − CAC, не сырую выручку − CAC"
     }
 ];
