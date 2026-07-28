@@ -42,6 +42,20 @@ body {
     -webkit-overflow-scrolling: touch;
 }
 
+html.quiz-setup-open {
+    overflow: hidden;
+    overscroll-behavior: none;
+}
+
+body.quiz-setup-open {
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+    left: 0;
+    right: 0;
+    overscroll-behavior: none;
+}
+
 body::before {
     content: '';
     position: fixed;
@@ -339,18 +353,18 @@ body::before {
     border-radius: 999px;
 }
 
-/* Mode picker */
+/* Mode picker / quiz setup dialog */
 .mode-picker {
     position: fixed;
     inset: 0;
     z-index: 100;
-    display: block;
-    overflow-x: hidden;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: max(12px, env(safe-area-inset-top, 0px)) 12px
+        max(12px, env(safe-area-inset-bottom, 0px));
+    overflow: hidden;
     overscroll-behavior: contain;
-    padding: max(16px, env(safe-area-inset-top, 0px)) 16px
-        max(16px, env(safe-area-inset-bottom, 0px));
 }
 
 .mode-picker.hidden {
@@ -358,7 +372,7 @@ body::before {
 }
 
 .mode-picker-backdrop {
-    position: fixed;
+    position: absolute;
     inset: 0;
     background: rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(4px);
@@ -366,12 +380,18 @@ body::before {
 
 .mode-picker-card {
     position: relative;
+    z-index: 1;
     width: min(480px, 100%);
-    margin: min(8vh, 32px) auto;
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 28px 24px 24px;
+    padding: 28px 24px max(24px, env(safe-area-inset-bottom, 0px));
     box-shadow: var(--shadow);
 }
 
@@ -568,7 +588,8 @@ body::before {
 
 .setup-start-btn {
     width: 100%;
-    margin-top: 4px;
+    margin-top: 12px;
+    flex-shrink: 0;
 }
 
 .setup-start-btn:disabled {
@@ -2284,9 +2305,19 @@ body::before {
         padding: 16px;
     }
 
+    .mode-picker {
+        align-items: stretch;
+        padding: max(8px, env(safe-area-inset-top, 0px)) 8px
+            max(8px, env(safe-area-inset-bottom, 0px));
+    }
+
     .mode-picker-card {
-        margin: 12px auto;
-        padding: 22px 16px 18px;
+        width: 100%;
+        max-height: none;
+        height: calc(100dvh - 16px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+        max-height: calc(100dvh - 16px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+        margin: 0;
+        padding: 20px 16px max(16px, env(safe-area-inset-bottom, 0px));
     }
 
     .mode-picker-sub {

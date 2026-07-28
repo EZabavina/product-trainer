@@ -922,6 +922,25 @@ function applyCurrentRoute({ replace = false } = {}) {
     }
 }
 
+let setupBodyScrollY = 0;
+const QUIZ_SETUP_OPEN_CLASS = "quiz-setup-open";
+
+function lockBodyForQuizSetup() {
+    if (document.documentElement.classList.contains(QUIZ_SETUP_OPEN_CLASS)) return;
+    setupBodyScrollY = window.scrollY || 0;
+    document.documentElement.classList.add(QUIZ_SETUP_OPEN_CLASS);
+    document.body.classList.add(QUIZ_SETUP_OPEN_CLASS);
+    document.body.style.top = `-${setupBodyScrollY}px`;
+}
+
+function unlockBodyForQuizSetup() {
+    if (!document.documentElement.classList.contains(QUIZ_SETUP_OPEN_CLASS)) return;
+    document.documentElement.classList.remove(QUIZ_SETUP_OPEN_CLASS);
+    document.body.classList.remove(QUIZ_SETUP_OPEN_CLASS);
+    document.body.style.top = "";
+    window.scrollTo(0, setupBodyScrollY);
+}
+
 function renderQuizSetup() {
     if (!pendingSetup) return;
 
@@ -1036,6 +1055,9 @@ function renderQuizSetup() {
                 : `Начать · ${getSetupSessionSize()} вопросов`;
     }
 
+    if (quizSetup.classList.contains("hidden")) {
+        lockBodyForQuizSetup();
+    }
     quizSetup.classList.remove("hidden");
     syncSetupRoute();
 }
@@ -1133,8 +1155,12 @@ function buildTopicSetupUrl(topicName, mode, length = "standard") {
 }
 
 function closeQuizSetup({ resetRoute = true } = {}) {
+    const wasOpen = !quizSetup.classList.contains("hidden");
     quizSetup.classList.add("hidden");
     pendingSetup = null;
+    if (wasOpen) {
+        unlockBodyForQuizSetup();
+    }
 
     if (!resetRoute || isApplyingRoute) return;
 
