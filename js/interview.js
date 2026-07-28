@@ -158,6 +158,11 @@ async function endInterview() {
         interviewDebriefContent.innerHTML = formatDebrief(data.content);
         setInterviewLoading(false);
 
+        const debriefActions = interviewDebriefScreen?.querySelector(".results-actions");
+        if (typeof ensurePrimaryActionVisible === "function") {
+            ensurePrimaryActionVisible(debriefActions, interviewDebriefContent);
+        }
+
         const userTurns = chatMessages.filter((m) => m.role === "user").length;
         let savedOk = true;
         let saveError = "";
@@ -274,6 +279,11 @@ function replayInterviewRecord(id) {
                 })
                 .join("")}
         `;
+    }
+
+    const debriefActions = interviewDebriefScreen?.querySelector(".results-actions");
+    if (typeof ensurePrimaryActionVisible === "function") {
+        ensurePrimaryActionVisible(debriefActions, interviewDebriefContent);
     }
 }
 

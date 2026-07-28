@@ -26,6 +26,8 @@
 
 html {
     scroll-behavior: smooth;
+    overflow-x: clip;
+    overflow-y: auto;
 }
 
 body {
@@ -33,7 +35,11 @@ body {
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
+    min-height: 100dvh;
     line-height: 1.5;
+    overflow-x: clip;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 body::before {
@@ -53,7 +59,7 @@ body::before {
     z-index: 1;
     max-width: 960px;
     margin: 0 auto;
-    padding: 24px 20px 48px;
+    padding: 24px 20px calc(48px + env(safe-area-inset-bottom, 0px));
 }
 
 .main {
@@ -338,10 +344,13 @@ body::before {
     position: fixed;
     inset: 0;
     z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
+    display: block;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding: max(16px, env(safe-area-inset-top, 0px)) 16px
+        max(16px, env(safe-area-inset-bottom, 0px));
 }
 
 .mode-picker.hidden {
@@ -349,7 +358,7 @@ body::before {
 }
 
 .mode-picker-backdrop {
-    position: absolute;
+    position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(4px);
@@ -358,6 +367,7 @@ body::before {
 .mode-picker-card {
     position: relative;
     width: min(480px, 100%);
+    margin: min(8vh, 32px) auto;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
@@ -1277,6 +1287,7 @@ body::before {
 .actions {
     display: flex;
     justify-content: flex-end;
+    gap: 10px;
 }
 
 .hidden {
@@ -2195,6 +2206,101 @@ body::before {
     .overall-stat {
         align-items: flex-start;
     }
+
+    /* Primary CTAs stay on screen; content remains scrollable above them.
+       has-mobile-actions is set by JS (works without :has). :has kept as progressive enhance. */
+    .has-mobile-actions,
+    #quiz-screen:has(.actions .btn:not(.hidden)),
+    #unit-calc-screen:has(.uc-actions .btn:not(.hidden)),
+    #unit-lab-screen:has(.ul-actions .btn:not(.hidden)),
+    #results-screen:has(.results-actions .btn:not(.hidden)),
+    #interview-debrief-screen:has(.results-actions .btn:not(.hidden)) {
+        padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .actions.mobile-action-bar,
+    .uc-actions.mobile-action-bar,
+    .ul-actions.mobile-action-bar,
+    .results-actions.mobile-action-bar,
+    #quiz-screen .actions:has(.btn:not(.hidden)),
+    #unit-calc-screen .uc-actions:has(.btn:not(.hidden)),
+    #unit-lab-screen .ul-actions:has(.btn:not(.hidden)),
+    #results-screen .results-actions:has(.btn:not(.hidden)),
+    #interview-debrief-screen .results-actions:has(.btn:not(.hidden)) {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 50;
+        display: flex;
+        justify-content: stretch;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 0;
+        padding: 12px max(16px, env(safe-area-inset-right, 0px))
+            calc(12px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+        background: linear-gradient(
+            to top,
+            var(--bg) 0%,
+            var(--bg) 62%,
+            rgba(15, 23, 42, 0.92) 82%,
+            rgba(15, 23, 42, 0)
+        );
+        box-sizing: border-box;
+    }
+
+    .has-mobile-actions .actions .btn,
+    .has-mobile-actions .uc-actions .btn,
+    .has-mobile-actions .ul-actions .btn,
+    .has-mobile-actions .results-actions .btn,
+    #quiz-screen .actions .btn,
+    #unit-calc-screen .uc-actions .btn,
+    #unit-lab-screen .ul-actions .btn,
+    #results-screen .results-actions .btn,
+    #interview-debrief-screen .results-actions .btn {
+        flex: 1 1 140px;
+        width: auto;
+        min-height: 48px;
+    }
+
+    /* Reserve space so scrollIntoView clears the fixed CTA bar */
+    .feedback,
+    .uc-feedback,
+    .ul-ch-feedback,
+    .results-recommendation {
+        scroll-margin-bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+    }
+
+    #feedback-cheatsheet .inline-cheatsheet,
+    #feedback-cheatsheet .inline-cheatsheet-list {
+        max-height: 140px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .feedback {
+        flex-direction: column;
+        gap: 10px;
+        padding: 16px;
+    }
+
+    .mode-picker-card {
+        margin: 12px auto;
+        padding: 22px 16px 18px;
+    }
+
+    .mode-picker-sub {
+        padding-left: 0;
+    }
+
+    .interview-compose {
+        position: sticky;
+        bottom: 0;
+        z-index: 30;
+        margin: 0 -4px;
+        padding: 10px 4px calc(10px + env(safe-area-inset-bottom, 0px));
+        background: linear-gradient(to top, var(--bg) 70%, rgba(15, 23, 42, 0.94) 90%, transparent);
+    }
 }
 
 @media (max-width: 480px) {
@@ -2204,6 +2310,22 @@ body::before {
 
     .question-card {
         padding: 20px;
+    }
+
+    .app {
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+
+    .quiz-top {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .quiz-meta {
+        flex-wrap: wrap;
+        width: 100%;
+        justify-content: space-between;
     }
 }
 

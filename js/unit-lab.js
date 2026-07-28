@@ -172,6 +172,13 @@ function startUnitLab() {
 function closeUnitLab() {
     unitLabActive = false;
     unitLabScreen?.classList.add("hidden");
+    const actionsEl = unitLabScreen?.querySelector(".ul-actions");
+    if (typeof clearMobileActionBar === "function") {
+        clearMobileActionBar(actionsEl);
+    } else {
+        unitLabScreen?.classList.remove("has-mobile-actions");
+        actionsEl?.classList.remove("mobile-action-bar");
+    }
 }
 
 function confirmLeaveUnitLab() {
@@ -273,6 +280,11 @@ function renderUnitLabChallenge(model) {
     btnUnitLabCheck?.classList.remove("hidden");
     btnUnitLabNext?.classList.add("hidden");
     document.getElementById("unit-lab-answer")?.focus();
+
+    const actionsEl = document.querySelector("#unit-lab-screen .ul-actions");
+    if (typeof ensurePrimaryActionVisible === "function") {
+        ensurePrimaryActionVisible(actionsEl, null, { scroll: false });
+    }
 }
 
 function onUnitLabInputChange(e) {
@@ -347,6 +359,11 @@ function checkUnitLabChallenge() {
                 ? "Следующий челлендж →"
                 : "Результаты →";
     }
+
+    const actionsEl = document.querySelector("#unit-lab-screen .ul-actions");
+    if (typeof ensurePrimaryActionVisible === "function") {
+        ensurePrimaryActionVisible(actionsEl, fb || actionsEl);
+    }
 }
 
 function finishUnitLab() {
@@ -409,6 +426,11 @@ function finishUnitLab() {
             ringFill.style.strokeDashoffset = RING - (percent / 100) * RING;
         });
         ringFill.style.stroke = percent >= 80 ? "#10B981" : percent >= 50 ? "#F59E0B" : "#EF4444";
+    }
+
+    const resultsActions = resultsScreen?.querySelector(".results-actions");
+    if (typeof ensurePrimaryActionVisible === "function") {
+        ensurePrimaryActionVisible(resultsActions, rec || resultsActions);
     }
 }
 

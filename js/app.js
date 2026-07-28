@@ -1489,6 +1489,12 @@ function showMainView(view, options = {}) {
     resultsScreen.classList.add("hidden");
     document.getElementById("unit-calc-screen")?.classList.add("hidden");
     document.getElementById("unit-lab-screen")?.classList.add("hidden");
+    quizScreen?.classList.remove("has-mobile-actions");
+    resultsScreen?.classList.remove("has-mobile-actions");
+    document.getElementById("interview-debrief-screen")?.classList.remove("has-mobile-actions");
+    document.querySelectorAll(".mobile-action-bar").forEach((el) => {
+        el.classList.remove("mobile-action-bar");
+    });
     setNavVisible(true);
 
     document.querySelectorAll(".nav-tab").forEach((tab) => {
@@ -1745,6 +1751,14 @@ function renderQuestion({ restoreSelectedIndex = null, skipLifecycleView = false
     syncActiveQuizUrl();
     persistActiveQuizSession({ phase: "quiz" });
 
+    const actionsEl = btnNext.closest(".actions");
+    if (typeof clearMobileActionBar === "function") {
+        clearMobileActionBar(actionsEl);
+    } else if (actionsEl) {
+        actionsEl.classList.remove("mobile-action-bar");
+        quizScreen?.classList.remove("has-mobile-actions");
+    }
+
     if (!skipLifecycleView) {
         trackQuestionView();
     }
@@ -1828,6 +1842,11 @@ function revealAnswer(selectedIndex, { recordOutcome = true } = {}) {
     btnNext.classList.remove("hidden");
 
     persistActiveQuizSession({ phase: "quiz" });
+
+    const actionsEl = btnNext.closest(".actions");
+    if (typeof ensurePrimaryActionVisible === "function") {
+        ensurePrimaryActionVisible(actionsEl, feedback);
+    }
 }
 
 function selectAnswer(selectedIndex) {
@@ -2052,6 +2071,11 @@ function paintResultsScreen(percent, total, { skipRecord = false } = {}) {
     quizScreen.classList.add("hidden");
     resultsScreen.classList.remove("hidden");
     setNavVisible(false);
+
+    const resultsActions = resultsScreen.querySelector(".results-actions");
+    if (typeof ensurePrimaryActionVisible === "function") {
+        ensurePrimaryActionVisible(resultsActions, resultsRecommendation || resultsActions);
+    }
 
     ringFill.style.strokeDashoffset = RING_CIRCUMFERENCE;
     requestAnimationFrame(() => {

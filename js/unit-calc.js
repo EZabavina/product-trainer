@@ -102,6 +102,13 @@ function closeUnitCalc() {
     unitCalcActive = false;
     unitCalcQueue = [];
     unitCalcScreen?.classList.add("hidden");
+    const actionsEl = unitCalcScreen?.querySelector(".uc-actions");
+    if (typeof clearMobileActionBar === "function") {
+        clearMobileActionBar(actionsEl);
+    } else {
+        unitCalcScreen?.classList.remove("has-mobile-actions");
+        actionsEl?.classList.remove("mobile-action-bar");
+    }
 }
 
 function confirmLeaveUnitCalc() {
@@ -152,6 +159,12 @@ function renderUnitCalcTask() {
     btnUnitCalcCheck.classList.remove("hidden");
     btnUnitCalcNext.classList.add("hidden");
     btnUnitCalcCheck.disabled = false;
+
+    /* Sync fixed-bar classes only — no scroll (focus on input would fight it) */
+    const actionsEl = document.querySelector("#unit-calc-screen .uc-actions");
+    if (typeof ensurePrimaryActionVisible === "function") {
+        ensurePrimaryActionVisible(actionsEl, null, { scroll: false });
+    }
 
     const firstInput = unitCalcAsk.querySelector(".uc-input");
     firstInput?.focus();
@@ -220,6 +233,11 @@ function checkUnitCalcAnswers() {
 
     if (unitCalcFill) {
         unitCalcFill.style.width = `${((unitCalcIndex + 1) / unitCalcQueue.length) * 100}%`;
+    }
+
+    const actionsEl = document.querySelector("#unit-calc-screen .uc-actions");
+    if (typeof ensurePrimaryActionVisible === "function") {
+        ensurePrimaryActionVisible(actionsEl, unitCalcFeedback || actionsEl);
     }
 }
 
@@ -297,6 +315,11 @@ function finishUnitCalc() {
 
     const btnReview = document.getElementById("btn-review-mistakes");
     btnReview?.classList.add("hidden");
+
+    const resultsActions = resultsScreen?.querySelector(".results-actions");
+    if (typeof ensurePrimaryActionVisible === "function") {
+        ensurePrimaryActionVisible(resultsActions, resultsRecommendation || resultsActions);
+    }
 }
 
 btnUnitCalcCheck?.addEventListener("click", checkUnitCalcAnswers);
