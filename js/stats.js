@@ -231,7 +231,11 @@ function exportProgressCsv() {
             "percent",
             "questionId",
             "correct",
-            "selectedIndex"
+            "selectedIndex",
+            "selectedLetter",
+            "questionText",
+            "selectedText",
+            "correctText"
         ].join(",")
     ];
 
@@ -250,6 +254,10 @@ function exportProgressCsv() {
                 s.percent,
                 "",
                 "",
+                "",
+                "",
+                "",
+                "",
                 ""
             ]
                 .map(csvEscape)
@@ -260,6 +268,16 @@ function exportProgressCsv() {
     events.forEach((e) => {
         // Сессии уже из loadStats — type:"session" из журнала ответов не дублируем
         if (e.type !== "answer") return;
+        const labels =
+            typeof resolveAnswerEventLabels === "function"
+                ? resolveAnswerEventLabels(e)
+                : {
+                      questionText: e.questionText || "",
+                      selectedText: e.selectedText || "",
+                      correctText: e.correctText || ""
+                  };
+        const selectedLetter =
+            typeof optionLetter === "function" ? optionLetter(e.selectedIndex) : "";
         rows.push(
             [
                 "answer",
@@ -274,7 +292,11 @@ function exportProgressCsv() {
                 "",
                 e.questionId ?? "",
                 e.correct === true ? "1" : e.correct === false ? "0" : "",
-                e.selectedIndex ?? ""
+                e.selectedIndex ?? "",
+                selectedLetter,
+                labels.questionText,
+                labels.selectedText,
+                labels.correctText
             ]
                 .map(csvEscape)
                 .join(",")

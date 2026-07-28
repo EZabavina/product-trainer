@@ -59,6 +59,12 @@ export default async function handler(req, res) {
             questionId: event.questionId ?? null,
             correct: event.type === "answer" ? Boolean(event.correct) : undefined,
             selectedIndex: event.selectedIndex ?? null,
+            questionText:
+                typeof event.questionText === "string" ? event.questionText.slice(0, 500) : null,
+            selectedText:
+                typeof event.selectedText === "string" ? event.selectedText.slice(0, 300) : null,
+            correctText:
+                typeof event.correctText === "string" ? event.correctText.slice(0, 300) : null,
             topic: typeof event.topic === "string" ? event.topic.slice(0, 80) : null,
             mode: typeof event.mode === "string" ? event.mode.slice(0, 40) : null,
             quizType: typeof event.quizType === "string" ? event.quizType.slice(0, 40) : null,

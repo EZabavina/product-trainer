@@ -335,6 +335,12 @@ function checkUnitLabChallenge() {
         recordAnswerOutcome({
             questionId: `unit-lab:${ch.id}`,
             correct: ok,
+            questionText: ch.prompt ? `${ch.title}: ${ch.prompt}` : ch.title,
+            selectedText: input?.value?.trim() || "",
+            correctText: formatLabNum(
+                expected,
+                ch.metric === "roi" || ch.metric === "ltvCac" ? "ratio" : "num"
+            ),
             topic: "Юнит-экономика",
             mode: "lab",
             quizType: "unit-lab",

@@ -13,10 +13,113 @@
  * 4. После правок кода — новое развёртывание (новая версия) или
  *    «Управлять развёртываниями» → карандаш → Новая версия.
  *
- * Лист "events" создаётся автоматически.
+ * Лист "events" создаётся автоматически. При обновлении скрипта
+ * колонки questionText / selectedText / correctText вставляются после
+ * selectedIndex (а не в конец листа).
  */
 
 var SHEET_NAME = "events";
+
+var EVENT_HEADERS = [
+  "receivedAt",
+  "date",
+  "type",
+  "questionId",
+  "correct",
+  "selectedIndex",
+  "questionText",
+  "selectedText",
+  "correctText",
+  "topic",
+  "mode",
+  "quizType",
+  "sessionId",
+  "sessionLength",
+  "score",
+  "total",
+  "percent",
+  "source"
+];
+
+function normalizeHeader(value) {
+  return String(value || "").trim();
+}
+
+function readHeaderRow(sheet) {
+  if (sheet.getLastRow() === 0 || sheet.getLastColumn() === 0) {
+    return [];
+  }
+  return sheet
+    .getRange(1, 1, 1, sheet.getLastColumn())
+    .getValues()[0]
+    .map(normalizeHeader);
+}
+
+function headersMatch(existing, expected) {
+  if (existing.length !== expected.length) {
+    return false;
+  }
+  for (var i = 0; i < expected.length; i++) {
+    if (normalizeHeader(existing[i]) !== expected[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function isBrokenTrailingHeaderMigration(existing) {
+  return (
+    existing.length >= EVENT_HEADERS.length &&
+    normalizeHeader(existing[6]) === "topic" &&
+    normalizeHeader(existing[15]) === "total" &&
+    normalizeHeader(existing[16]) === "percent" &&
+    normalizeHeader(existing[17]) === "source"
+  );
+}
+
+/**
+ * Приводит лист к актуальной схеме колонок.
+ * - старая схема (15 колонок, topic на позиции 7): вставляет 3 колонки после selectedIndex
+ * - ошибочная миграция (дубли total/percent/source в конце): правит заголовки и удаляет хвост
+ */
+function ensureEventHeaders(sheet) {
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(EVENT_HEADERS);
+    return;
+  }
+
+  var existing = readHeaderRow(sheet);
+  if (headersMatch(existing, EVENT_HEADERS)) {
+    return;
+  }
+
+  if (normalizeHeader(existing[6]) === "questionText") {
+    if (existing.length < EVENT_HEADERS.length) {
+      sheet
+        .getRange(1, existing.length + 1, 1, EVENT_HEADERS.length)
+        .setValues([EVENT_HEADERS.slice(existing.length)]);
+    }
+    return;
+  }
+
+  if (isBrokenTrailingHeaderMigration(existing)) {
+    sheet.getRange(1, 7, 1, 9).setValues([["questionText", "selectedText", "correctText"]]);
+    if (existing.length > EVENT_HEADERS.length) {
+      sheet.getRange(1, EVENT_HEADERS.length + 1, 1, existing.length).clearContent();
+    }
+    return;
+  }
+
+  if (normalizeHeader(existing[6]) === "topic" && existing.length <= 15) {
+    sheet.insertColumns(7, 3);
+    sheet.getRange(1, 7, 1, 9).setValues([["questionText", "selectedText", "correctText"]]);
+    return;
+  }
+
+  if (existing.length === EVENT_HEADERS.length) {
+    sheet.getRange(1, 1, 1, EVENT_HEADERS.length).setValues([EVENT_HEADERS]);
+  }
+}
 
 function doPost(e) {
   try {
@@ -44,27 +147,7 @@ function doPost(e) {
       sheet = ss.insertSheet(SHEET_NAME);
     }
 
-    var headers = [
-      "receivedAt",
-      "date",
-      "type",
-      "questionId",
-      "correct",
-      "selectedIndex",
-      "topic",
-      "mode",
-      "quizType",
-      "sessionId",
-      "sessionLength",
-      "score",
-      "total",
-      "percent",
-      "source"
-    ];
-
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow(headers);
-    }
+    ensureEventHeaders(sheet);
 
     sheet.appendRow([
       event.receivedAt || new Date().toISOString(),
@@ -73,6 +156,9 @@ function doPost(e) {
       event.questionId != null ? event.questionId : "",
       event.correct === true ? "TRUE" : event.correct === false ? "FALSE" : "",
       event.selectedIndex != null ? event.selectedIndex : "",
+      event.questionText || "",
+      event.selectedText || "",
+      event.correctText || "",
       event.topic || "",
       event.mode || "",
       event.quizType || "",

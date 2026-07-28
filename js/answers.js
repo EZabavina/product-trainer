@@ -29,6 +29,83 @@ function createQuizSessionId() {
     return `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+const OPTION_LETTERS = ["A", "B", "C", "D"];
+
+function optionLetter(index) {
+    return typeof index === "number" && index >= 0 && index < OPTION_LETTERS.length
+        ? OPTION_LETTERS[index]
+        : "";
+}
+
+function trimEventText(value, maxLen) {
+    if (typeof value !== "string") return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    return trimmed.length > maxLen ? `${trimmed.slice(0, maxLen - 1)}…` : trimmed;
+}
+
+/**
+ * Тексты вопроса и ответов для экспорта / старых событий без questionText.
+ */
+function lookupAnswerEventLabels(event) {
+    const id = event.questionId;
+    if (id == null) {
+        return { questionText: "", selectedText: "", correctText: "" };
+    }
+
+    const q =
+        typeof QUESTIONS !== "undefined"
+            ? QUESTIONS.find((item) => item.id === id || item.id === Number(id))
+            : null;
+    if (q) {
+        return {
+            questionText: q.question,
+            selectedText:
+                typeof event.selectedIndex === "number"
+                    ? q.options[event.selectedIndex] || ""
+                    : "",
+            correctText: q.options[q.correct] || ""
+        };
+    }
+
+    const calc =
+        typeof UNIT_CALC_SCENARIOS !== "undefined"
+            ? UNIT_CALC_SCENARIOS.find((item) => `unit-calc:${item.id}` === String(id))
+            : null;
+    if (calc) {
+        return {
+            questionText: calc.brief ? `${calc.title}: ${calc.brief}` : calc.title,
+            selectedText: "",
+            correctText: (calc.ask || [])
+                .map((a) => `${a.label}: ${a.answer}`)
+                .join("; ")
+        };
+    }
+
+    const lab =
+        typeof UNIT_LAB_CHALLENGES !== "undefined"
+            ? UNIT_LAB_CHALLENGES.find((item) => `unit-lab:${item.id}` === String(id))
+            : null;
+    if (lab) {
+        return {
+            questionText: lab.prompt ? `${lab.title}: ${lab.prompt}` : lab.title,
+            selectedText: "",
+            correctText: ""
+        };
+    }
+
+    return { questionText: `Вопрос #${id}`, selectedText: "", correctText: "" };
+}
+
+function resolveAnswerEventLabels(event) {
+    const fromLookup = lookupAnswerEventLabels(event);
+    return {
+        questionText: event.questionText || fromLookup.questionText,
+        selectedText: event.selectedText || fromLookup.selectedText,
+        correctText: event.correctText || fromLookup.correctText
+    };
+}
+
 /**
  * Записать исход одного ответа.
  * @returns {object} event
@@ -41,6 +118,9 @@ function recordAnswerOutcome(payload) {
         correct: Boolean(payload.correct),
         selectedIndex:
             typeof payload.selectedIndex === "number" ? payload.selectedIndex : null,
+        questionText: trimEventText(payload.questionText, 500),
+        selectedText: trimEventText(payload.selectedText, 300),
+        correctText: trimEventText(payload.correctText, 300),
         topic: payload.topic || null,
         mode: payload.mode || null,
         quizType: payload.quizType || "topic",
@@ -227,17 +307,16 @@ function getHardestQuestions(limit = 10, minAttempts = 2) {
     return getQuestionOutcomeStats()
         .filter((row) => row.attempts >= minAttempts && row.wrong > 0)
         .map((row) => {
+            const labels =
+                typeof resolveAnswerEventLabels === "function"
+                    ? resolveAnswerEventLabels({ questionId: row.questionId, topic: row.topic })
+                    : { questionText: "", selectedText: "", correctText: "" };
             const q = qById.get(row.questionId);
             const calc = calcById.get(String(row.questionId));
-            let question = q?.question || null;
-            if (!question && calc) {
-                question = `Расчёт: ${calc.title}`;
-            }
-            if (!question) question = `Вопрос #${row.questionId}`;
 
             return {
                 ...row,
-                question,
+                question: labels.questionText || `Вопрос #${row.questionId}`,
                 topic: row.topic || q?.topic || (calc ? "Юнит-экономика" : "—")
             };
         })
