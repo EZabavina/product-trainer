@@ -42,7 +42,14 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: "event.type required" });
         }
 
-        const allowed = new Set(["answer", "session"]);
+        const allowed = new Set([
+            "answer",
+            "session",
+            "session_start",
+            "question_view",
+            "session_exit",
+            "session_complete"
+        ]);
         if (!allowed.has(event.type)) {
             return res.status(400).json({ error: "unsupported event.type" });
         }
@@ -61,6 +68,14 @@ export default async function handler(req, res) {
             score: typeof event.score === "number" ? event.score : null,
             total: typeof event.total === "number" ? event.total : null,
             percent: typeof event.percent === "number" ? event.percent : null,
+            route: typeof event.route === "string" ? event.route.slice(0, 120) : null,
+            formatSlug: typeof event.formatSlug === "string" ? event.formatSlug.slice(0, 40) : null,
+            topicSlug: typeof event.topicSlug === "string" ? event.topicSlug.slice(0, 40) : null,
+            questionIndex: typeof event.questionIndex === "number" ? event.questionIndex : null,
+            exitReason: typeof event.exitReason === "string" ? event.exitReason.slice(0, 40) : null,
+            plannedQuestions:
+                typeof event.plannedQuestions === "number" ? event.plannedQuestions : null,
+            answeredCount: typeof event.answeredCount === "number" ? event.answeredCount : null,
             date: event.date || new Date().toISOString(),
             receivedAt: new Date().toISOString()
         };

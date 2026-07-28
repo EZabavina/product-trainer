@@ -4,11 +4,21 @@ let currentSessionLength = "standard";
 let currentQuizSessionId = null;
 let currentQuizType = "topic";
 let currentMistakeFilter = "all";
+let currentPracticePoolIds = null;
 let quizQuestions = [];
 let currentIndex = 0;
 let score = 0;
 let answered = false;
+let currentSelectedIndex = null;
 let wrongAnswers = [];
+let resultsPercentCached = null;
+let isApplyingRoute = false;
+let currentAppUrl = `${location.pathname}${location.search}`;
+let currentSessionEntryRoute = "/";
+let activeQuizSessionMeta = null;
+let sessionExitSent = false;
+
+const QUIZ_SESSION_STORAGE_KEY = "pt_active_quiz_v1";
 
 const trainView = document.getElementById("train-view");
 const statsView = document.getElementById("stats-view");
@@ -86,6 +96,36 @@ const SESSION_LENGTHS = [
     { id: "marathon", label: "Марафон", count: null, icon: "🏁", description: "Все из пула" }
 ];
 
+const ROUTE_TOPIC_TO_NAME = {
+    metrics: "Метрики",
+    unit: "Юнит-экономика",
+    fin: "Финансовая модель",
+    jtbd: "JTBD",
+    custdev: "CustDev"
+};
+
+const ROUTE_NAME_TO_TOPIC = Object.fromEntries(
+    Object.entries(ROUTE_TOPIC_TO_NAME).map(([slug, name]) => [name, slug])
+);
+
+const ROUTE_FORMATS = {
+    quiz: { topicSlugs: ["fin", "jtbd", "unit", "custdev"], modeByTopic: { unit: "quiz", custdev: "quiz" } },
+    definitions: { topicSlugs: ["metrics"], modeByTopic: { metrics: "определение" } },
+    cases: { topicSlugs: ["metrics"], modeByTopic: { metrics: "кейс" } },
+    calc: { topicSlugs: ["unit"], modeByTopic: { unit: "calc" } },
+    lab: { topicSlugs: ["unit"], modeByTopic: { unit: "lab" } },
+    interview: { topicSlugs: ["custdev"], modeByTopic: { custdev: "interview" } }
+};
+
+const ROUTE_LENGTH_MAP = {
+    "5": "quick",
+    "15": "standard",
+    "40": "marathon",
+    quick: "quick",
+    standard: "standard",
+    marathon: "marathon"
+};
+
 function shuffle(array) {
     const arr = [...array];
     for (let i = arr.length - 1; i > 0; i--) {
@@ -109,6 +149,374 @@ function getSessionSize(poolSize, lengthId = "standard") {
     return Math.min(cfg.count, poolSize);
 }
 
+function getLengthRouteValue(lengthId = "standard") {
+    if (lengthId === "quick") return "5";
+    if (lengthId === "marathon") return "marathon";
+    return "15";
+}
+
+function isLengthRouteFormat(formatSlug) {
+    return ["quiz", "definitions", "cases"].includes(formatSlug);
+}
+
+function buildTrainPath({ format, topicSlug, length, q = null, done = false }) {
+    const base = `/train/${format}/${topicSlug}/`;
+    const params = new URLSearchParams();
+    if (isLengthRouteFormat(format)) {
+        params.set("length", getLengthRouteValue(length || "standard"));
+    }
+    if (done) {
+        params.set("done", "1");
+    } else if (q != null && Number(q) > 0) {
+        params.set("q", String(Number(q)));
+    }
+    const qs = params.toString();
+    return qs ? `${base}?${qs}` : base;
+}
+
+function getTopicNameFromRoute(topicSlug) {
+    return ROUTE_TOPIC_TO_NAME[topicSlug] || null;
+}
+
+function getRouteLengthId(rawLength) {
+    return ROUTE_LENGTH_MAP[String(rawLength || "").trim()] || "standard";
+}
+
+function getFormatForTopicMode(topicName, mode) {
+    const topicSlug = ROUTE_NAME_TO_TOPIC[topicName];
+    if (!topicSlug) return null;
+    if (topicSlug === "metrics" && mode === "определение") return "definitions";
+    if (topicSlug === "metrics" && mode === "кейс") return "cases";
+    if (topicSlug === "unit" && mode === "calc") return "calc";
+    if (topicSlug === "unit" && mode === "lab") return "lab";
+    if (topicSlug === "custdev" && mode === "interview") return "interview";
+    return "quiz";
+}
+
+function stripQuizProgressParams(urlString) {
+    try {
+        const url = new URL(urlString, location.origin);
+        url.searchParams.delete("q");
+        url.searchParams.delete("done");
+        return `${url.pathname}${url.search}`;
+    } catch {
+        return urlString;
+    }
+}
+
+function parseAppRoute(url = new URL(location.href)) {
+    const pathname = url.pathname.replace(/\/+$/, "") || "/";
+    if (pathname === "/") return { kind: "view", view: "train", canonicalUrl: "/" };
+    if (pathname === "/knowledge") {
+        return { kind: "view", view: "knowledge", canonicalUrl: "/knowledge" };
+    }
+    if (pathname === "/stats") return { kind: "view", view: "stats", canonicalUrl: "/stats" };
+
+    const parts = pathname.split("/").filter(Boolean);
+    if (parts.length === 3 && parts[0] === "train") {
+        const [, format, topicSlug] = parts;
+        const formatCfg = ROUTE_FORMATS[format];
+        const topicName = getTopicNameFromRoute(topicSlug);
+        if (!formatCfg || !topicName || !formatCfg.topicSlugs.includes(topicSlug)) return null;
+        const mode = formatCfg.modeByTopic?.[topicSlug] || null;
+        const length = getRouteLengthId(url.searchParams.get("length"));
+        const done = url.searchParams.get("done") === "1";
+        const rawQ = Number(url.searchParams.get("q"));
+        const q = !done && Number.isFinite(rawQ) && rawQ > 0 ? Math.floor(rawQ) : null;
+        return {
+            kind: "train",
+            format,
+            topicSlug,
+            topicName,
+            mode,
+            length,
+            q,
+            done,
+            canonicalUrl: buildTrainPath({ format, topicSlug, length, q, done })
+        };
+    }
+
+    return null;
+}
+
+function getCurrentUrl() {
+    return `${location.pathname}${location.search}`;
+}
+
+function trackRouteView(url) {
+    if (typeof trackMetrikaHit === "function") {
+        trackMetrikaHit(url);
+    }
+}
+
+function loadActiveQuizSession() {
+    try {
+        const raw = sessionStorage.getItem(QUIZ_SESSION_STORAGE_KEY);
+        if (!raw) return null;
+        const data = JSON.parse(raw);
+        if (!data || data.version !== 1 || !Array.isArray(data.questionIds)) return null;
+        return data;
+    } catch {
+        return null;
+    }
+}
+
+function clearActiveQuizSession() {
+    try {
+        sessionStorage.removeItem(QUIZ_SESSION_STORAGE_KEY);
+    } catch {
+        /* ignore */
+    }
+}
+
+function canSyncQuizTrainUrl() {
+    return currentQuizType === "topic" && Boolean(ROUTE_NAME_TO_TOPIC[currentTopic]);
+}
+
+function buildCurrentQuizTrainUrl({ q = null, done = false } = {}) {
+    if (!canSyncQuizTrainUrl()) return null;
+    const topicSlug = ROUTE_NAME_TO_TOPIC[currentTopic];
+    const format = getFormatForTopicMode(currentTopic, currentTopicMode);
+    if (!format || !ROUTE_FORMATS[format]?.topicSlugs.includes(topicSlug)) return null;
+    return buildTrainPath({
+        format,
+        topicSlug,
+        length: currentSessionLength || "standard",
+        q,
+        done
+    });
+}
+
+function persistActiveQuizSession(extra = {}) {
+    if (!quizQuestions.length) return;
+    if (currentQuizType !== "topic" && currentQuizType !== "mistakes" && currentQuizType !== "practice") {
+        return;
+    }
+
+    const phase =
+        extra.phase ||
+        (!resultsScreen.classList.contains("hidden") ? "results" : "quiz");
+
+    const payload = {
+        version: 1,
+        sessionId: currentQuizSessionId,
+        topic: currentTopic,
+        mode: currentTopicMode,
+        length: currentSessionLength,
+        quizType: currentQuizType,
+        mistakeFilter: currentMistakeFilter,
+        practicePoolIds: currentPracticePoolIds,
+        questionIds: quizQuestions.map((q) => q.id),
+        currentIndex,
+        score,
+        answered,
+        selectedIndex: answered ? currentSelectedIndex : null,
+        wrongAnswers,
+        phase,
+        percent: phase === "results" ? resultsPercentCached : null,
+        entryRoute: currentSessionEntryRoute || stripQuizProgressParams(getCurrentUrl()),
+        format: getFormatForTopicMode(currentTopic, currentTopicMode),
+        topicSlug: ROUTE_NAME_TO_TOPIC[currentTopic] || null,
+        ...extra
+    };
+
+    try {
+        sessionStorage.setItem(QUIZ_SESSION_STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+        /* ignore quota / private mode */
+    }
+}
+
+function sessionMatchesRoute(session, route) {
+    if (!session || !route || route.kind !== "train") return false;
+    if (session.quizType !== "topic") return false;
+    if (session.topic !== route.topicName) return false;
+    if ((session.mode || null) !== (route.mode || null)) return false;
+    if ((session.length || "standard") !== (route.length || "standard")) return false;
+    if (session.format && session.format !== route.format) return false;
+    if (session.topicSlug && session.topicSlug !== route.topicSlug) return false;
+    return Array.isArray(session.questionIds) && session.questionIds.length > 0;
+}
+
+function rebuildQuizQuestionsFromIds(ids) {
+    const byId = new Map(QUESTIONS.map((q) => [q.id, q]));
+    const restored = ids.map((id) => byId.get(id)).filter(Boolean);
+    return restored.length === ids.length ? restored : null;
+}
+
+function syncActiveQuizUrl({ replace = true, track = true, force = false } = {}) {
+    if (isApplyingRoute && !force) return;
+    if (!canSyncQuizTrainUrl()) return;
+
+    const done = !resultsScreen.classList.contains("hidden");
+    const q = done ? null : currentIndex + 1;
+    const nextUrl = buildCurrentQuizTrainUrl({ q, done });
+    if (!nextUrl || nextUrl === getCurrentUrl()) {
+        currentAppUrl = getCurrentUrl();
+        return;
+    }
+
+    if (replace) history.replaceState({}, "", nextUrl);
+    else history.pushState({}, "", nextUrl);
+    currentAppUrl = getCurrentUrl();
+    if (track) trackRouteView(currentAppUrl);
+}
+
+function enterActiveSession() {
+    const stripped = stripQuizProgressParams(getCurrentUrl());
+    if (stripped.startsWith("/train/")) {
+        currentSessionEntryRoute = stripped;
+        return;
+    }
+
+    const built = currentTopic
+        ? buildTopicSetupUrl(currentTopic, currentTopicMode, currentSessionLength || "standard")
+        : "/";
+    if (built.startsWith("/train/")) {
+        currentSessionEntryRoute = built;
+    } else if (!currentSessionEntryRoute || currentSessionEntryRoute === "/") {
+        currentSessionEntryRoute = stripped || "/";
+    }
+}
+
+function buildSessionLifecyclePayload(extra = {}) {
+    let formatSlug = null;
+    let topicSlug = null;
+    const parsed = parseAppRoute(new URL(`${location.origin}${currentSessionEntryRoute || "/"}`));
+    if (parsed?.kind === "train") {
+        formatSlug = parsed.format;
+        topicSlug = parsed.topicSlug;
+    }
+
+    return {
+        route: currentSessionEntryRoute || "/",
+        formatSlug,
+        topicSlug,
+        topic: currentTopic,
+        mode: currentTopicMode,
+        quizType: currentQuizType,
+        sessionLength: currentSessionLength,
+        sessionId: currentQuizSessionId,
+        ...extra
+    };
+}
+
+function beginQuizSession(extra = {}) {
+    enterActiveSession();
+    activeQuizSessionMeta = buildSessionLifecyclePayload(extra);
+    sessionExitSent = false;
+    if (!extra.restored && typeof recordLifecycleEvent === "function") {
+        recordLifecycleEvent({ type: "session_start", ...activeQuizSessionMeta });
+    }
+}
+
+function trackQuestionView() {
+    if (!activeQuizSessionMeta || typeof recordLifecycleEvent !== "function") return;
+    const q = quizQuestions[currentIndex];
+    if (!q) return;
+    recordLifecycleEvent({
+        type: "question_view",
+        ...activeQuizSessionMeta,
+        questionIndex: currentIndex + 1,
+        questionId: q.id,
+        plannedQuestions: quizQuestions.length
+    });
+}
+
+function trackSessionExit(exitReason, { clearStorage = true } = {}) {
+    if (!activeQuizSessionMeta || sessionExitSent) return;
+    if (quizScreen.classList.contains("hidden")) return;
+
+    sessionExitSent = true;
+    const q = quizQuestions[currentIndex];
+    const answeredCount = currentIndex + (answered ? 1 : 0);
+    if (typeof recordLifecycleEvent === "function") {
+        recordLifecycleEvent({
+            type: "session_exit",
+            ...activeQuizSessionMeta,
+            questionIndex: currentIndex + 1,
+            questionId: q?.id ?? null,
+            answeredCount,
+            plannedQuestions: quizQuestions.length,
+            exitReason
+        });
+    }
+    activeQuizSessionMeta = null;
+    currentSessionEntryRoute = "/";
+    if (clearStorage) {
+        clearActiveQuizSession();
+    }
+}
+
+function trackSessionComplete(score, total, percent) {
+    if (!activeQuizSessionMeta || typeof recordLifecycleEvent !== "function") return;
+    sessionExitSent = true;
+    recordLifecycleEvent({
+        type: "session_complete",
+        ...activeQuizSessionMeta,
+        score,
+        total,
+        percent,
+        plannedQuestions: total,
+        answeredCount: total
+    });
+    activeQuizSessionMeta = null;
+}
+
+function canLeaveCurrentFlow(exitReason = "leave_confirm") {
+    const inActiveQuiz = !quizScreen.classList.contains("hidden");
+    const inResults = !resultsScreen.classList.contains("hidden");
+
+    if (inActiveQuiz && (answered || currentIndex > 0)) {
+        if (!confirm("Выйти из квиза? Прогресс этой попытки будет сброшен.")) {
+            return false;
+        }
+    }
+    if (inActiveQuiz) {
+        trackSessionExit(exitReason);
+    } else if (inResults) {
+        clearActiveQuizSession();
+        currentSessionEntryRoute = "/";
+    }
+
+    if (typeof isInterviewActive === "function" && isInterviewActive() && !confirmLeaveInterview()) {
+        return false;
+    }
+
+    if (typeof isUnitCalcActive === "function" && isUnitCalcActive() && !confirmLeaveUnitCalc()) {
+        return false;
+    }
+
+    if (typeof isUnitLabActive === "function" && isUnitLabActive() && !confirmLeaveUnitLab()) {
+        return false;
+    }
+
+    return true;
+}
+
+function navigateToUrl(nextUrl, { replace = false, exitReason = "nav_click" } = {}) {
+    if (nextUrl === currentAppUrl) return;
+    if (!canLeaveCurrentFlow(exitReason)) return;
+
+    if (replace) history.replaceState({}, "", nextUrl);
+    else history.pushState({}, "", nextUrl);
+    applyCurrentRoute({ replace });
+}
+
+function syncUrlForMainView(view, { replace = false } = {}) {
+    const map = {
+        train: "/",
+        knowledge: "/knowledge",
+        stats: "/stats"
+    };
+    const url = map[view];
+    if (!url || isApplyingRoute || getCurrentUrl() === url) return;
+    if (replace) history.replaceState({}, "", url);
+    else history.pushState({}, "", url);
+    currentAppUrl = getCurrentUrl();
+    trackRouteView(currentAppUrl);
+}
+
 function getModeLabel(topicName, modeId) {
     const cfg = getTopicConfig(topicName);
     const mode = cfg.modes?.find((m) => m.id === modeId);
@@ -127,6 +535,10 @@ function isCalcMode(topicName, modeId) {
     return getModeConfig(topicName, modeId)?.type === "calc";
 }
 
+function isLabMode(topicName, modeId) {
+    return getModeConfig(topicName, modeId)?.type === "lab";
+}
+
 function isQuizModeAll(topicName, modeId) {
     const mode = getModeConfig(topicName, modeId);
     return mode?.type === "quiz";
@@ -139,6 +551,9 @@ function getTopicCountText(topicName) {
             .map((m) => {
                 if (m.type === "interview") {
                     return `${getInterviewScenarioCount()} сценариев`;
+                }
+                if (m.type === "lab") {
+                    return `${typeof getUnitLabChallengeCount === "function" ? getUnitLabChallengeCount() : 6} челленджей`;
                 }
                 if (m.type === "calc") {
                     return `${getUnitCalcScenarioCount()} расчётов`;
@@ -156,6 +571,10 @@ function getTopicCountText(topicName) {
 function getModeCountLabel(topicName, mode) {
     if (mode.type === "interview") {
         return `${getInterviewScenarioCount()} сценариев`;
+    }
+    if (mode.type === "lab") {
+        const n = typeof getUnitLabChallengeCount === "function" ? getUnitLabChallengeCount() : 6;
+        return `${n} челленджей · живая модель`;
     }
     if (mode.type === "calc") {
         return `${getUnitCalcScenarioCount()} заданий`;
@@ -269,6 +688,25 @@ function renderTopics() {
     renderMistakesBanner();
 }
 
+function syncSetupRoute({ replace = true } = {}) {
+    if (isApplyingRoute || !pendingSetup || pendingSetup.kind !== "topic") return;
+    if (!quizScreen.classList.contains("hidden") || !resultsScreen.classList.contains("hidden")) {
+        return;
+    }
+
+    const nextUrl = buildTopicSetupUrl(
+        pendingSetup.topic,
+        pendingSetup.mode,
+        pendingSetup.length || "standard"
+    );
+    if (nextUrl === getCurrentUrl()) return;
+
+    if (replace) history.replaceState({}, "", nextUrl);
+    else history.pushState({}, "", nextUrl);
+    currentAppUrl = getCurrentUrl();
+    trackRouteView(currentAppUrl);
+}
+
 function openQuizSetupForTopic(topic) {
     const cfg = getTopicConfig(topic);
     pendingSetup = {
@@ -283,6 +721,205 @@ function openQuizSetupForTopic(topic) {
 function openQuizSetupForMistakes() {
     pendingSetup = { kind: "mistakes", filter: "all", length: "standard" };
     renderQuizSetup();
+}
+
+function openTopicSetupFromRoute(route) {
+    showMainView("train", { syncRoute: false });
+    pendingSetup = {
+        kind: "topic",
+        topic: route.topicName,
+        mode: route.mode,
+        length: route.length
+    };
+    if (isInterviewMode(route.topicName, route.mode)) {
+        pendingSetup.scenarioId = null;
+    }
+
+    const setupUrl = buildTrainPath({
+        format: route.format,
+        topicSlug: route.topicSlug,
+        length: route.length
+    });
+    if (setupUrl !== getCurrentUrl()) {
+        history.replaceState({}, "", setupUrl);
+        currentAppUrl = setupUrl;
+    }
+
+    renderQuizSetup();
+}
+
+function startFreshQuizFromRoute(route) {
+    pendingSetup = {
+        kind: "topic",
+        topic: route.topicName,
+        mode: route.mode,
+        length: route.length
+    };
+    const pool = getSetupPool();
+    pendingSetup = null;
+    if (!pool.length) {
+        openTopicSetupFromRoute(route);
+        alert("В этом формате пока нет вопросов.");
+        return;
+    }
+    launchQuiz({
+        pool,
+        topic: route.topicName,
+        mode: route.mode,
+        length: route.length,
+        quizType: "topic"
+    });
+}
+
+function resumeQuizSession(session) {
+    const restoredQuestions = rebuildQuizQuestionsFromIds(session.questionIds);
+    if (!restoredQuestions) {
+        clearActiveQuizSession();
+        return false;
+    }
+
+    currentTopic = session.topic;
+    currentTopicMode = session.mode;
+    currentSessionLength = session.length || "standard";
+    currentQuizType = session.quizType || "topic";
+    currentMistakeFilter = session.mistakeFilter || "all";
+    currentPracticePoolIds = session.practicePoolIds || null;
+    quizQuestions = restoredQuestions;
+    currentIndex = Math.min(
+        Math.max(0, Number(session.currentIndex) || 0),
+        Math.max(0, quizQuestions.length - 1)
+    );
+    score = Number(session.score) || 0;
+    answered = Boolean(session.answered);
+    currentSelectedIndex =
+        answered && Number.isFinite(session.selectedIndex) ? Number(session.selectedIndex) : null;
+    wrongAnswers = Array.isArray(session.wrongAnswers) ? session.wrongAnswers : [];
+    currentQuizSessionId = session.sessionId || createQuizSessionId();
+    currentSessionEntryRoute =
+        session.entryRoute ||
+        stripQuizProgressParams(getCurrentUrl()) ||
+        "/";
+    resultsPercentCached =
+        session.percent != null
+            ? session.percent
+            : Math.round((score / Math.max(quizQuestions.length, 1)) * 100);
+
+    beginQuizSession({
+        plannedQuestions: quizQuestions.length,
+        restored: true
+    });
+
+    trainView.classList.add("hidden");
+    statsView.classList.add("hidden");
+    knowledgeView.classList.add("hidden");
+    setNavVisible(false);
+    closeQuizSetup({ resetRoute: false });
+
+    if (session.phase === "results") {
+        quizScreen.classList.add("hidden");
+        resultsScreen.classList.remove("hidden");
+        paintResultsScreen(resultsPercentCached, quizQuestions.length, { skipRecord: true });
+        syncActiveQuizUrl({ track: false, force: true });
+        persistActiveQuizSession({ phase: "results", percent: resultsPercentCached });
+        return true;
+    }
+
+    resultsScreen.classList.add("hidden");
+    quizScreen.classList.remove("hidden");
+    updateQuizBadge();
+    renderQuestion({
+        restoreSelectedIndex: answered ? currentSelectedIndex : null,
+        skipLifecycleView: true
+    });
+    syncActiveQuizUrl({ track: false, force: true });
+    persistActiveQuizSession({ phase: "quiz" });
+    return true;
+}
+
+function applyTrainRoute(route) {
+    if (isLabMode(route.topicName, route.mode)) {
+        showMainView("train", { syncRoute: false });
+        startUnitLab();
+        return;
+    }
+
+    if (isCalcMode(route.topicName, route.mode)) {
+        showMainView("train", { syncRoute: false });
+        startUnitCalc(route.length);
+        return;
+    }
+
+    if (isInterviewMode(route.topicName, route.mode) && !route.q && !route.done) {
+        openTopicSetupFromRoute(route);
+        return;
+    }
+
+    const session = loadActiveQuizSession();
+
+    if (route.done) {
+        if (sessionMatchesRoute(session, route) && session.phase === "results") {
+            resumeQuizSession(session);
+            return;
+        }
+        clearActiveQuizSession();
+        openTopicSetupFromRoute(route);
+        return;
+    }
+
+    if (route.q) {
+        if (sessionMatchesRoute(session, route)) {
+            resumeQuizSession(session);
+            return;
+        }
+        clearActiveQuizSession();
+        startFreshQuizFromRoute(route);
+        return;
+    }
+
+    if (sessionMatchesRoute(session, route) && session.phase === "quiz") {
+        if (confirm("Продолжить незавершённый квиз с того места, где остановились?")) {
+            resumeQuizSession(session);
+            return;
+        }
+        clearActiveQuizSession();
+    } else if (sessionMatchesRoute(session, route) && session.phase === "results") {
+        if (confirm("Показать результаты последней попытки?")) {
+            resumeQuizSession(session);
+            return;
+        }
+        clearActiveQuizSession();
+    }
+
+    openTopicSetupFromRoute(route);
+}
+
+function applyCurrentRoute({ replace = false } = {}) {
+    const route = parseAppRoute(new URL(location.href));
+    if (!route) {
+        history.replaceState({}, "", "/");
+        currentAppUrl = "/";
+        trackRouteView(currentAppUrl);
+        showMainView("train", { syncRoute: false });
+        return;
+    }
+
+    isApplyingRoute = true;
+    try {
+        if (route.canonicalUrl !== getCurrentUrl()) {
+            history.replaceState({}, "", route.canonicalUrl);
+        }
+
+        if (route.kind === "view") {
+            showMainView(route.view, { syncRoute: false });
+        } else if (route.kind === "train") {
+            applyTrainRoute(route);
+        }
+
+        currentAppUrl = getCurrentUrl();
+        trackRouteView(currentAppUrl);
+    } finally {
+        isApplyingRoute = false;
+    }
 }
 
 function renderQuizSetup() {
@@ -371,8 +1008,10 @@ function renderQuizSetup() {
         isInterviewMode(pendingSetup.topic, pendingSetup.mode);
     const isCalc =
         pendingSetup.kind === "topic" && isCalcMode(pendingSetup.topic, pendingSetup.mode);
+    const isLab =
+        pendingSetup.kind === "topic" && isLabMode(pendingSetup.topic, pendingSetup.mode);
 
-    setupLengthSection.classList.toggle("hidden", isInterview);
+    setupLengthSection.classList.toggle("hidden", isInterview || isLab);
     setupScenarioSection.classList.toggle("hidden", !isInterview);
 
     if (isInterview) {
@@ -380,6 +1019,10 @@ function renderQuizSetup() {
         setupStart.textContent = pendingSetup.scenarioId
             ? "Начать интервью"
             : "Выберите сценарий";
+    } else if (isLab) {
+        const n = typeof getUnitLabChallengeCount === "function" ? getUnitLabChallengeCount() : 6;
+        setupStart.disabled = false;
+        setupStart.textContent = `Открыть лаб · ${n} челленджей`;
     } else if (isCalc) {
         const n = getSessionSize(getUnitCalcScenarioCount(), pendingSetup.length || "standard");
         setupStart.disabled = getUnitCalcScenarioCount() === 0;
@@ -394,6 +1037,7 @@ function renderQuizSetup() {
     }
 
     quizSetup.classList.remove("hidden");
+    syncSetupRoute();
 }
 
 function renderScenarioOptions(color) {
@@ -457,10 +1101,17 @@ function getSetupPool() {
         return typeof UNIT_CALC_SCENARIOS !== "undefined" ? UNIT_CALC_SCENARIOS : [];
     }
 
+    if (isLabMode(pendingSetup.topic, pendingSetup.mode)) {
+        return [];
+    }
+
     let pool = QUESTIONS.filter((q) => q.topic === pendingSetup.topic);
     const cfg = getTopicConfig(pendingSetup.topic);
     if (cfg.modes?.length && pendingSetup.mode) {
         if (isInterviewMode(pendingSetup.topic, pendingSetup.mode)) {
+            return [];
+        }
+        if (isLabMode(pendingSetup.topic, pendingSetup.mode)) {
             return [];
         }
         if (!isQuizModeAll(pendingSetup.topic, pendingSetup.mode)) {
@@ -474,9 +1125,34 @@ function getSetupSessionSize() {
     return getSessionSize(getSetupPool().length, pendingSetup?.length || "standard");
 }
 
-function closeQuizSetup() {
+function buildTopicSetupUrl(topicName, mode, length = "standard") {
+    const topicSlug = ROUTE_NAME_TO_TOPIC[topicName];
+    if (!topicSlug) return "/";
+    const format = getFormatForTopicMode(topicName, mode) || "quiz";
+    return buildTrainPath({ format, topicSlug, length });
+}
+
+function closeQuizSetup({ resetRoute = true } = {}) {
     quizSetup.classList.add("hidden");
     pendingSetup = null;
+
+    if (!resetRoute || isApplyingRoute) return;
+
+    const inSession =
+        !quizScreen.classList.contains("hidden") ||
+        !resultsScreen.classList.contains("hidden") ||
+        (typeof isInterviewActive === "function" && isInterviewActive()) ||
+        (typeof isUnitCalcActive === "function" && isUnitCalcActive()) ||
+        (typeof isUnitLabActive === "function" && isUnitLabActive());
+    if (inSession) return;
+
+    if (!getCurrentUrl().startsWith("/train/")) return;
+    const route = parseAppRoute(new URL(location.href));
+    if (route?.q || route?.done) return;
+
+    history.replaceState({}, "", "/");
+    currentAppUrl = "/";
+    trackRouteView(currentAppUrl);
 }
 
 function startQuizFromSetup() {
@@ -488,8 +1164,17 @@ function startQuizFromSetup() {
     ) {
         if (!pendingSetup.scenarioId) return;
         const scenarioId = pendingSetup.scenarioId;
-        closeQuizSetup();
+        closeQuizSetup({ resetRoute: false });
         startInterview(scenarioId);
+        return;
+    }
+
+    if (
+        pendingSetup.kind === "topic" &&
+        isLabMode(pendingSetup.topic, pendingSetup.mode)
+    ) {
+        closeQuizSetup({ resetRoute: false });
+        startUnitLab();
         return;
     }
 
@@ -498,7 +1183,7 @@ function startQuizFromSetup() {
         isCalcMode(pendingSetup.topic, pendingSetup.mode)
     ) {
         const length = pendingSetup.length || "standard";
-        closeQuizSetup();
+        closeQuizSetup({ resetRoute: false });
         startUnitCalc(length);
         return;
     }
@@ -527,7 +1212,7 @@ function startQuizFromSetup() {
         });
     }
 
-    closeQuizSetup();
+    closeQuizSetup({ resetRoute: false });
 }
 
 function renderStatsView() {
@@ -557,10 +1242,12 @@ function renderStatsView() {
         if (typeof bindSkillsTableInteractions === "function") {
             bindSkillsTableInteractions(gradesSection);
         }
+        bindPracticeTriggers(gradesSection);
     }
 
     if (hardestQuestionsSection && typeof renderHardestQuestionsHtml === "function") {
         hardestQuestionsSection.innerHTML = renderHardestQuestionsHtml(10);
+        bindPracticeTriggers(hardestQuestionsSection);
     }
 
     if (interviewHistorySection && typeof renderInterviewHistoryHtml === "function") {
@@ -745,11 +1432,19 @@ function navigateWithTransition(updateView) {
 }
 
 function goHome() {
-    const inActiveQuiz =
-        !quizScreen.classList.contains("hidden") && (answered || currentIndex > 0);
+    const inActiveQuiz = !quizScreen.classList.contains("hidden");
+    const inResults = !resultsScreen.classList.contains("hidden");
 
-    if (inActiveQuiz && !confirm("Выйти на главную? Текущий прогресс квиза не сохранится.")) {
-        return;
+    if (inActiveQuiz && (answered || currentIndex > 0)) {
+        if (!confirm("Выйти на главную? Прогресс этой попытки будет сброшен.")) {
+            return;
+        }
+    }
+    if (inActiveQuiz) {
+        trackSessionExit("home_button");
+    } else if (inResults) {
+        clearActiveQuizSession();
+        currentSessionEntryRoute = "/";
     }
 
     if (typeof isInterviewActive === "function" && isInterviewActive()) {
@@ -760,6 +1455,11 @@ function goHome() {
     if (typeof isUnitCalcActive === "function" && isUnitCalcActive()) {
         if (!confirmLeaveUnitCalc()) return;
         closeUnitCalc();
+    }
+
+    if (typeof isUnitLabActive === "function" && isUnitLabActive()) {
+        if (!confirmLeaveUnitLab()) return;
+        closeUnitLab();
     }
 
     navigateWithTransition(() => {
@@ -777,16 +1477,18 @@ function setNavVisible(visible) {
     document.querySelector(".nav-tabs").classList.toggle("hidden", !visible);
 }
 
-function showMainView(view) {
+function showMainView(view, options = {}) {
     closeQuizSetup();
     if (typeof closeInterview === "function") closeInterview();
     if (typeof closeUnitCalc === "function") closeUnitCalc();
+    if (typeof closeUnitLab === "function") closeUnitLab();
     trainView.classList.add("hidden");
     statsView.classList.add("hidden");
     knowledgeView.classList.add("hidden");
     quizScreen.classList.add("hidden");
     resultsScreen.classList.add("hidden");
     document.getElementById("unit-calc-screen")?.classList.add("hidden");
+    document.getElementById("unit-lab-screen")?.classList.add("hidden");
     setNavVisible(true);
 
     document.querySelectorAll(".nav-tab").forEach((tab) => {
@@ -803,9 +1505,6 @@ function showMainView(view) {
         if (typeof trackMetrika === "function") {
             trackMetrika("view_stats");
         }
-        if (typeof trackMetrikaHit === "function") {
-            trackMetrikaHit(location.pathname + "#stats");
-        }
         statsView.classList.remove("hidden");
         try {
             renderStatsView();
@@ -816,6 +1515,10 @@ function showMainView(view) {
         knowledgeView.classList.remove("hidden");
         renderKnowledgeView(knowledgeFilter);
     }
+
+    if (options.syncRoute !== false) {
+        syncUrlForMainView(view, { replace: options.replaceRoute === true });
+    }
 }
 
 function launchQuiz({ pool, topic, mode, length, quizType, mistakeFilter = "all" }) {
@@ -824,13 +1527,19 @@ function launchQuiz({ pool, topic, mode, length, quizType, mistakeFilter = "all"
     currentSessionLength = length;
     currentQuizType = quizType;
     currentMistakeFilter = mistakeFilter;
+    currentPracticePoolIds =
+        quizType === "practice" ? [...new Set(pool.map((q) => Number(q.id)).filter(Number.isFinite))] : null;
 
     quizQuestions = shuffle(pool).slice(0, getSessionSize(pool.length, length));
     currentIndex = 0;
     score = 0;
     answered = false;
+    currentSelectedIndex = null;
     wrongAnswers = [];
+    resultsPercentCached = null;
     currentQuizSessionId = createQuizSessionId();
+
+    beginQuizSession({ plannedQuestions: quizQuestions.length });
 
     if (typeof trackMetrika === "function") {
         trackMetrika("quiz_start", {
@@ -844,15 +1553,70 @@ function launchQuiz({ pool, topic, mode, length, quizType, mistakeFilter = "all"
 
     trainView.classList.add("hidden");
     statsView.classList.add("hidden");
+    knowledgeView.classList.add("hidden");
     resultsScreen.classList.add("hidden");
     quizScreen.classList.remove("hidden");
     setNavVisible(false);
 
     updateQuizBadge();
+    syncActiveQuizUrl({ force: true, track: !isApplyingRoute });
+    persistActiveQuizSession({ phase: "quiz" });
     renderQuestion();
 }
 
+/**
+ * Быстрый раунд по списку questionId (сложные вопросы / пробелы скилов).
+ */
+function launchPracticeFromIds(questionIds, { label = "Практика", length = "standard" } = {}) {
+    const idSet = new Set(
+        (questionIds || [])
+            .map((id) => Number(id))
+            .filter((id) => Number.isFinite(id))
+    );
+    const pool = QUESTIONS.filter((q) => idSet.has(q.id));
+    if (!pool.length) {
+        alert("Нет вопросов для тренировки по этой выборке.");
+        return;
+    }
+    launchQuiz({
+        pool,
+        topic: label,
+        mode: null,
+        length,
+        quizType: "practice",
+        mistakeFilter: "all"
+    });
+}
+
+function bindPracticeTriggers(root) {
+    if (!root) return;
+    root.querySelectorAll("[data-practice-ids]").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            let ids = [];
+            try {
+                ids = JSON.parse(btn.getAttribute("data-practice-ids") || "[]");
+            } catch {
+                ids = [];
+            }
+            const label = btn.getAttribute("data-practice-label") || "Практика";
+            const length = btn.getAttribute("data-practice-length") || "standard";
+            launchPracticeFromIds(ids, { label, length });
+        });
+    });
+}
+
 function updateQuizBadge() {
+    if (currentQuizType === "practice") {
+        const len =
+            currentSessionLength !== "standard"
+                ? ` · ${getSessionLengthLabel(currentSessionLength) || currentSessionLength}`
+                : "";
+        quizTopicBadge.textContent = `🎯 ${currentTopic || "Практика"}${len}`;
+        quizTopicBadge.style.borderColor = "#38BDF844";
+        return;
+    }
+
     if (currentQuizType === "mistakes") {
         const filterLabel =
             currentMistakeFilter === "all"
@@ -880,9 +1644,34 @@ function updateQuizBadge() {
 }
 
 function restartQuiz() {
+    if (currentQuizType === "unit-lab") {
+        document.getElementById("results-screen")?.classList.add("hidden");
+        startUnitLab();
+        return;
+    }
+
     if (currentQuizType === "unit-calc") {
         document.getElementById("results-screen")?.classList.add("hidden");
         startUnitCalc(currentSessionLength || "standard");
+        return;
+    }
+
+    if (currentQuizType === "practice") {
+        const ids = Array.isArray(currentPracticePoolIds) && currentPracticePoolIds.length
+            ? currentPracticePoolIds
+            : quizQuestions.map((q) => q.id);
+        const pool = QUESTIONS.filter((q) => ids.includes(q.id));
+        if (pool.length === 0) {
+            showMainView("stats");
+            return;
+        }
+        launchQuiz({
+            pool,
+            topic: currentTopic,
+            mode: null,
+            length: currentSessionLength,
+            quizType: "practice"
+        });
         return;
     }
 
@@ -919,8 +1708,9 @@ function restartQuiz() {
     });
 }
 
-function renderQuestion() {
+function renderQuestion({ restoreSelectedIndex = null, skipLifecycleView = false } = {}) {
     answered = false;
+    currentSelectedIndex = null;
     const q = quizQuestions[currentIndex];
     const total = quizQuestions.length;
     const num = currentIndex + 1;
@@ -951,32 +1741,58 @@ function renderQuestion() {
         feedbackCheatsheet.classList.add("hidden");
     }
     btnNext.classList.add("hidden");
+
+    syncActiveQuizUrl();
+    persistActiveQuizSession({ phase: "quiz" });
+
+    if (!skipLifecycleView) {
+        trackQuestionView();
+    }
+
+    if (restoreSelectedIndex != null && Number.isFinite(restoreSelectedIndex)) {
+        revealAnswer(restoreSelectedIndex, { recordOutcome: false });
+    }
 }
 
-function selectAnswer(selectedIndex) {
-    if (answered) return;
-    answered = true;
-
+function revealAnswer(selectedIndex, { recordOutcome = true } = {}) {
     const q = quizQuestions[currentIndex];
     const isCorrect = selectedIndex === q.correct;
 
-    if (isCorrect) {
-        score++;
-        clearMistake(q.id);
-    } else {
-        recordMistake(q);
-    }
+    answered = true;
+    currentSelectedIndex = selectedIndex;
 
-    if (typeof recordAnswerOutcome === "function") {
-        recordAnswerOutcome({
-            questionId: q.id,
-            correct: isCorrect,
-            selectedIndex,
-            topic: q.topic,
-            mode: q.mode || currentTopicMode || null,
-            quizType: currentQuizType,
-            sessionId: currentQuizSessionId
-        });
+    if (recordOutcome) {
+        if (isCorrect) {
+            score++;
+            clearMistake(q.id);
+        } else {
+            recordMistake(q);
+        }
+
+        if (typeof recordAnswerOutcome === "function") {
+            recordAnswerOutcome({
+                questionId: q.id,
+                correct: isCorrect,
+                selectedIndex,
+                topic: q.topic,
+                mode: q.mode || currentTopicMode || null,
+                quizType: currentQuizType,
+                sessionId: currentQuizSessionId
+            });
+        }
+
+        if (!isCorrect) {
+            wrongAnswers.push({
+                id: q.id,
+                topic: q.topic,
+                question: q.question,
+                selected: selectedIndex,
+                correct: q.correct,
+                options: q.options,
+                explanation: q.explanation,
+                example: q.example
+            });
+        }
     }
 
     optionsList.querySelectorAll(".option-btn").forEach((btn, i) => {
@@ -1002,16 +1818,6 @@ function selectAnswer(selectedIndex) {
     }
 
     if (!isCorrect) {
-        wrongAnswers.push({
-            id: q.id,
-            topic: q.topic,
-            question: q.question,
-            selected: selectedIndex,
-            correct: q.correct,
-            options: q.options,
-            explanation: q.explanation,
-            example: q.example
-        });
         feedbackActions.classList.remove("hidden");
     } else {
         feedbackActions.classList.add("hidden");
@@ -1020,6 +1826,13 @@ function selectAnswer(selectedIndex) {
     btnNext.textContent =
         currentIndex < quizQuestions.length - 1 ? "Следующий вопрос →" : "Результаты →";
     btnNext.classList.remove("hidden");
+
+    persistActiveQuizSession({ phase: "quiz" });
+}
+
+function selectAnswer(selectedIndex) {
+    if (answered) return;
+    revealAnswer(selectedIndex, { recordOutcome: true });
 }
 
 function renderMistakesReview() {
@@ -1082,6 +1895,10 @@ function renderMistakesReview() {
 }
 
 function getResultsTitle() {
+    if (currentQuizType === "practice") {
+        return currentTopic || "Практика";
+    }
+
     if (currentQuizType === "mistakes") {
         const filterLabel =
             currentMistakeFilter === "all"
@@ -1105,40 +1922,83 @@ function updateResultsMistakesButton() {
 }
 
 function openKnowledgeForCurrentQuiz() {
-    if (currentQuizType === "mistakes") {
-        openKnowledge(currentMistakeFilter === "all" ? "all" : currentMistakeFilter);
-    } else {
-        openKnowledge(currentTopic);
+    const inActiveQuiz = !quizScreen.classList.contains("hidden");
+    const inResults = !resultsScreen.classList.contains("hidden");
+    const filter =
+        currentQuizType === "mistakes"
+            ? currentMistakeFilter === "all"
+                ? "all"
+                : currentMistakeFilter
+            : currentTopic || "all";
+
+    if (inActiveQuiz) {
+        if (answered || currentIndex > 0) {
+            if (
+                !confirm(
+                    "Открыть шпаргалку? Прогресс квиза сохранён — продолжите по ссылке тренировки или через вкладку «Тренировка»."
+                )
+            ) {
+                return;
+            }
+        }
+        persistActiveQuizSession({ phase: "quiz" });
+    } else if (inResults) {
+        persistActiveQuizSession({ phase: "results", percent: resultsPercentCached });
     }
+
+    knowledgeFilter = filter;
+    history.pushState({}, "", "/knowledge");
+    currentAppUrl = getCurrentUrl();
+    trackRouteView(currentAppUrl);
+    showMainView("knowledge", { syncRoute: false });
 }
 
 function showResults() {
     const total = quizQuestions.length;
     const percent = Math.round((score / total) * 100);
+    resultsPercentCached = percent;
 
-    recordSession(
-        currentQuizType === "mistakes" ? "Ошибки" : currentTopic,
-        score,
-        total,
-        currentTopicMode,
-        {
-            sessionLength: currentSessionLength,
-            quizType: currentQuizType,
-            sessionId: currentQuizSessionId
-        }
-    );
+    trackSessionComplete(score, total, percent);
+    paintResultsScreen(percent, total, { skipRecord: false });
+    syncActiveQuizUrl();
+    persistActiveQuizSession({ phase: "results", percent });
+}
 
-    if (typeof recordSessionOutcome === "function") {
-        recordSessionOutcome({
-            topic: currentQuizType === "mistakes" ? "Ошибки" : currentTopic,
-            mode: currentTopicMode,
-            quizType: currentQuizType,
-            sessionId: currentQuizSessionId,
-            sessionLength: currentSessionLength,
+function paintResultsScreen(percent, total, { skipRecord = false } = {}) {
+    if (!skipRecord) {
+        recordSession(
+            currentQuizType === "mistakes" || currentQuizType === "practice"
+                ? currentQuizType === "practice"
+                    ? currentTopic || "Практика"
+                    : "Ошибки"
+                : currentTopic,
             score,
             total,
-            percent
-        });
+            currentTopicMode,
+            {
+                sessionLength: currentSessionLength,
+                quizType: currentQuizType,
+                sessionId: currentQuizSessionId
+            }
+        );
+
+        if (typeof recordSessionOutcome === "function") {
+            recordSessionOutcome({
+                topic:
+                    currentQuizType === "mistakes"
+                        ? "Ошибки"
+                        : currentQuizType === "practice"
+                          ? currentTopic || "Практика"
+                          : currentTopic,
+                mode: currentTopicMode,
+                quizType: currentQuizType,
+                sessionId: currentQuizSessionId,
+                sessionLength: currentSessionLength,
+                score,
+                total,
+                percent
+            });
+        }
     }
 
     resultsTopic.textContent = getResultsTitle();
@@ -1146,7 +2006,15 @@ function showResults() {
     resultsDetail.textContent = `${score} из ${total} правильных`;
 
     let recommendation;
-    if (currentQuizType === "mistakes") {
+    if (currentQuizType === "practice") {
+        if (percent === 100) {
+            recommendation = "Подборка закрыта. Вернитесь к таблице скилов или сложным вопросам.";
+        } else if (percent >= 50) {
+            recommendation = "Часть вопросов ещё шатается — повторите эту же подборку или откройте шпаргалку.";
+        } else {
+            recommendation = "Сфокусируйтесь на объяснениях к ошибкам, затем снова «потренировать» эту выборку.";
+        }
+    } else if (currentQuizType === "mistakes") {
         if (percent === 100) {
             recommendation = "Отлично! Все ошибки в этом раунде исправлены. Проверьте банк — возможно, остались вопросы из других тем.";
         } else if (percent >= 50) {
@@ -1173,6 +2041,7 @@ function showResults() {
             <p class="results-recommendation-lead">${escapeHtml(recommendation)}</p>
             ${renderLearnNextHtml(learnNext)}
         `;
+        bindPracticeTriggers(resultsRecommendation);
     } else {
         resultsRecommendation.textContent = recommendation;
     }
@@ -1196,7 +2065,15 @@ function showResults() {
 }
 
 document.querySelectorAll(".nav-tab").forEach((tab) => {
-    tab.addEventListener("click", () => showMainView(tab.dataset.view));
+    tab.addEventListener("click", () => {
+        const url =
+            tab.dataset.view === "knowledge"
+                ? "/knowledge"
+                : tab.dataset.view === "stats"
+                  ? "/stats"
+                  : "/";
+        navigateToUrl(url);
+    });
 });
 
 btnNext.addEventListener("click", () => {
@@ -1209,13 +2086,10 @@ btnNext.addEventListener("click", () => {
 });
 
 btnBack.addEventListener("click", () => {
-    if (answered || currentIndex > 0) {
-        if (!confirm("Выйти из квиза? Текущий прогресс не сохранится.")) return;
-    }
-    showMainView("train");
+    navigateToUrl("/");
 });
 btnRestart.addEventListener("click", () => restartQuiz());
-btnHome.addEventListener("click", () => showMainView("train"));
+btnHome.addEventListener("click", () => navigateToUrl("/"));
 btnStudyTopic.addEventListener("click", () => openKnowledgeForCurrentQuiz());
 btnStudyAfterResults.addEventListener("click", () => openKnowledgeForCurrentQuiz());
 btnReviewMistakes.addEventListener("click", () => openQuizSetupForMistakes());
@@ -1251,4 +2125,23 @@ if (btnExportCsv) {
     });
 }
 
-showMainView("train");
+window.addEventListener("popstate", () => {
+    if (!canLeaveCurrentFlow("browser_back")) {
+        history.pushState({}, "", currentAppUrl);
+        return;
+    }
+    applyCurrentRoute({ replace: true });
+});
+
+window.addEventListener("pagehide", () => {
+    const inQuiz = !quizScreen.classList.contains("hidden");
+    const inResults = !resultsScreen.classList.contains("hidden");
+    if (inQuiz || inResults) {
+        persistActiveQuizSession();
+    }
+    if (inQuiz) {
+        trackSessionExit("pagehide", { clearStorage: false });
+    }
+});
+
+applyCurrentRoute({ replace: true });

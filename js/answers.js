@@ -77,6 +77,46 @@ function recordSessionOutcome(payload) {
     return event;
 }
 
+const LIFECYCLE_EVENT_TYPES = new Set([
+    "session_start",
+    "question_view",
+    "session_exit",
+    "session_complete"
+]);
+
+function recordLifecycleEvent(payload) {
+    const type = payload.type;
+    if (!LIFECYCLE_EVENT_TYPES.has(type)) return null;
+
+    const event = {
+        id: `lc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        type,
+        route: payload.route || null,
+        formatSlug: payload.formatSlug || null,
+        topicSlug: payload.topicSlug || null,
+        topic: payload.topic || null,
+        mode: payload.mode || null,
+        quizType: payload.quizType || null,
+        sessionId: payload.sessionId || null,
+        sessionLength: payload.sessionLength || null,
+        questionIndex: payload.questionIndex ?? null,
+        questionId: payload.questionId ?? null,
+        exitReason: payload.exitReason || null,
+        plannedQuestions: payload.plannedQuestions ?? null,
+        answeredCount: payload.answeredCount ?? null,
+        score: payload.score ?? null,
+        total: payload.total ?? null,
+        percent: payload.percent ?? null,
+        date: new Date().toISOString()
+    };
+
+    const data = loadAnswerLog();
+    data.events.push(event);
+    saveAnswerLog(data);
+    sendAnalyticsEvent(event);
+    return event;
+}
+
 function sendAnalyticsEvent(event) {
     try {
         if (typeof trackMetrika === "function") {
@@ -94,6 +134,23 @@ function sendAnalyticsEvent(event) {
                     percent: event.percent ?? 0,
                     score: event.score ?? 0,
                     total: event.total ?? 0
+                });
+            } else if (LIFECYCLE_EVENT_TYPES.has(event.type)) {
+                trackMetrika(event.type, {
+                    route: event.route || "",
+                    format: event.formatSlug || "",
+                    topic_slug: event.topicSlug || "",
+                    topic: event.topic || "",
+                    quiz_type: event.quizType || "",
+                    session_length: event.sessionLength || "",
+                    question_index: event.questionIndex ?? "",
+                    question_id: event.questionId ?? "",
+                    exit_reason: event.exitReason || "",
+                    planned_questions: event.plannedQuestions ?? "",
+                    answered_count: event.answeredCount ?? "",
+                    score: event.score ?? "",
+                    total: event.total ?? "",
+                    percent: event.percent ?? ""
                 });
             }
         }
@@ -217,6 +274,14 @@ function renderHardestQuestionsHtml(limit = 10) {
         `;
     }
 
+    const practiceIds = hardest
+        .map((row) => Number(row.questionId))
+        .filter((id) => Number.isFinite(id) && id > 0);
+    const practiceBtn =
+        practiceIds.length > 0
+            ? `<button type="button" class="btn btn-primary practice-cta" data-practice-ids='${JSON.stringify(practiceIds)}' data-practice-label="Сложные вопросы" data-practice-length="standard">Потренировать эти ${practiceIds.length}</button>`
+            : "";
+
     const rows = hardest
         .map((row) => {
             const errRate = Math.round((row.wrong / row.attempts) * 100);
@@ -240,6 +305,7 @@ function renderHardestQuestionsHtml(limit = 10) {
             <span>✓ ${summary.correct}</span>
             <span>✗ ${summary.wrong}</span>
             <span>Уникальных вопросов: ${summary.uniqueQuestions}</span>
+            ${practiceBtn}
         </div>
         ${
             hardest.length

@@ -3,6 +3,12 @@
   "buildCommand": "node scripts/vercel-build.mjs",
   "outputDirectory": "public",
   "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ],
   "functions": {
     "api/interview.js": {
       "maxDuration": 60,

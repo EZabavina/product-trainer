@@ -1,4 +1,6 @@
-/** Автогенерация: node scripts/build-question-skills.mjs */
+/** Сборка: node scripts/build-question-skills.mjs
+ * Источник: data/question-skills.json (+ overrides). Эвристика — только для новых id.
+ */
 const QUESTION_SKILLS = {
     "1": [
         "metrics.middle.know.3"

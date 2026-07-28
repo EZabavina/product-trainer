@@ -39,11 +39,19 @@ function getSessionTopicLabel(session) {
         return "CustDev · Симулятор";
     }
 
+    if (session.quizType === "unit-lab") {
+        return "Юнит-экономика · Лаб";
+    }
+
     if (session.quizType === "unit-calc") {
         const len = getSessionLengthLabel(session.sessionLength);
         return len && session.sessionLength !== "standard"
             ? `Юнит-экономика · Расчёты · ${len}`
             : "Юнит-экономика · Расчёты";
+    }
+
+    if (session.quizType === "practice") {
+        return session.topic ? `Практика · ${session.topic}` : "Практика";
     }
 
     if (session.quizType === "mistakes") {

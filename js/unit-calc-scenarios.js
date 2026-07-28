@@ -3,18 +3,18 @@ const UNIT_CALC_SCENARIOS = [
     {
         "id": "uc1",
         "title": "Число платящих",
-        "brief": "Food delivery. Считаем, сколько платящих получим из потока.",
+        "brief": "Food delivery. Из потока пользователей нужно найти число платящих.",
         "icon": "👥",
         "given": [
             {
                 "key": "users",
-                "label": "Поток пользователей",
+                "label": "Users",
                 "value": 50000,
                 "unit": ""
             },
             {
                 "key": "c1",
-                "label": "Конверсия в 1-ю покупку (C1)",
+                "label": "C1",
                 "value": 0.1,
                 "unit": "%",
                 "display": "10%"
@@ -23,36 +23,36 @@ const UNIT_CALC_SCENARIOS = [
         "ask": [
             {
                 "key": "buyers",
-                "label": "Число платящих (Buyers)",
-                "formula": "Buyers = Users × C1",
+                "label": "Buyers",
+                "formula": "Buyers",
                 "answer": 5000,
                 "hint": "50 000 × 10% = 5 000"
             }
         ],
-        "sheetHint": "Колонки: поток → C1 → Buyers"
+        "sheetHint": "Поток → C1 → Buyers"
     },
     {
         "id": "uc2",
         "title": "ARPPU / LTV платящего",
-        "brief": "Средний чек 600 ₽, комиссия/COGS 5%, в среднем 1,2 покупки на платящего.",
+        "brief": "Даны средний чек, COGS и число покупок на платящего. Найдите ARPPU.",
         "icon": "💵",
         "given": [
             {
                 "key": "avPrice",
-                "label": "Средний чек (AvPrice)",
+                "label": "AvPrice",
                 "value": 600,
                 "unit": "₽"
             },
             {
                 "key": "cogsPct",
-                "label": "COGS / комиссия",
+                "label": "COGS",
                 "value": 0.05,
                 "unit": "%",
                 "display": "5%"
             },
             {
                 "key": "lifetime",
-                "label": "Число покупок (Lifetime)",
+                "label": "Lifetime",
                 "value": 1.2,
                 "unit": ""
             }
@@ -60,29 +60,29 @@ const UNIT_CALC_SCENARIOS = [
         "ask": [
             {
                 "key": "arppu",
-                "label": "ARPPU / LTV платящего, ₽",
-                "formula": "ARPPU = AvPrice × (1 − COGS) × Lifetime",
+                "label": "ARPPU, ₽",
+                "formula": "ARPPU",
                 "answer": 684,
                 "hint": "600 × 0,95 × 1,2 = 684"
             }
         ],
-        "sheetHint": "Доход на 1-го платящего (AMPPU / ARPPU / CLTV)"
+        "sheetHint": "Доход на 1-го платящего (ARPPU / CLTV)"
     },
     {
         "id": "uc3",
         "title": "CAC платящего",
-        "brief": "На paid-канал потратили 100 000 ₽ и привлекли 1 000 платящих.",
+        "brief": "Paid-канал: известны spend и число платящих. Найдите CAC.",
         "icon": "🎯",
         "given": [
             {
                 "key": "spend",
-                "label": "Расход на привлечение",
+                "label": "Spend",
                 "value": 100000,
                 "unit": "₽"
             },
             {
                 "key": "buyers",
-                "label": "Платящие",
+                "label": "Buyers",
                 "value": 1000,
                 "unit": ""
             }
@@ -90,18 +90,18 @@ const UNIT_CALC_SCENARIOS = [
         "ask": [
             {
                 "key": "cac",
-                "label": "CAC платящего, ₽",
-                "formula": "CAC = Spend / Buyers",
+                "label": "CAC, ₽",
+                "formula": "CAC",
                 "answer": 100,
                 "hint": "100 000 / 1 000 = 100"
             }
         ],
-        "sheetHint": "CAC, Customer Acquisition Costs"
+        "sheetHint": "CAC"
     },
     {
         "id": "uc4",
         "title": "ARPU с привлечённого",
-        "brief": "ARPPU = 684 ₽, конверсия в покупку C1 = 10%. Сколько в среднем приносит один привлечённый пользователь?",
+        "brief": "Даны ARPPU и C1. Найдите ARPU на привлечённого пользователя.",
         "icon": "📉",
         "given": [
             {
@@ -121,48 +121,48 @@ const UNIT_CALC_SCENARIOS = [
         "ask": [
             {
                 "key": "arpu",
-                "label": "ARPU / LTV на привлечённого, ₽",
-                "formula": "ARPU = ARPPU × C1",
+                "label": "ARPU, ₽",
+                "formula": "ARPU",
                 "answer": 68.4,
                 "hint": "684 × 10% = 68,4"
             }
         ],
-        "sheetHint": "Доход на 1-го привлеченного (ARPU or LTV)"
+        "sheetHint": "Доход на 1-го привлечённого (ARPU)"
     },
     {
         "id": "uc5",
         "title": "Сходится ли юнит? LTV/CAC",
-        "brief": "Чек 600 ₽, COGS 5%, lifetime 1,2 покупки. На привлечение 1 000 платящих потратили 100 000 ₽. Сначала соберите LTV платящего и CAC, затем LTV/CAC.",
+        "brief": "Даны AvPrice, COGS, Lifetime, Spend и Buyers. Найдите LTV платящего, CAC и LTV/CAC.",
         "icon": "⚖️",
         "given": [
             {
                 "key": "avPrice",
-                "label": "Средний чек (AvPrice)",
+                "label": "AvPrice",
                 "value": 600,
                 "unit": "₽"
             },
             {
                 "key": "cogsPct",
-                "label": "COGS / комиссия",
+                "label": "COGS",
                 "value": 0.05,
                 "unit": "%",
                 "display": "5%"
             },
             {
                 "key": "lifetime",
-                "label": "Число покупок (Lifetime)",
+                "label": "Lifetime",
                 "value": 1.2,
                 "unit": ""
             },
             {
                 "key": "spend",
-                "label": "Расход на привлечение",
+                "label": "Spend",
                 "value": 100000,
                 "unit": "₽"
             },
             {
                 "key": "buyers",
-                "label": "Платящие",
+                "label": "Buyers",
                 "value": 1000,
                 "unit": ""
             }
@@ -170,32 +170,32 @@ const UNIT_CALC_SCENARIOS = [
         "ask": [
             {
                 "key": "ltv",
-                "label": "LTV платящего (ARPPU), ₽",
-                "formula": "LTV = AvPrice × (1 − COGS) × Lifetime",
+                "label": "LTV (ARPPU), ₽",
+                "formula": "LTV",
                 "answer": 684,
                 "hint": "600 × 0,95 × 1,2 = 684"
             },
             {
                 "key": "cac",
                 "label": "CAC, ₽",
-                "formula": "CAC = Spend / Buyers",
+                "formula": "CAC",
                 "answer": 100,
                 "hint": "100 000 / 1 000 = 100"
             },
             {
                 "key": "ratio",
-                "label": "LTV / CAC",
-                "formula": "LTV/CAC = LTV ÷ CAC",
+                "label": "LTV/CAC",
+                "formula": "LTV/CAC",
                 "answer": 6.84,
                 "hint": "684 / 100 = 6,84 — юнит сходится (≥ 3)"
             }
         ],
-        "sheetHint": "Ориентир: здоровый юнит часто ≥ 3"
+        "sheetHint": "Ориентир здорового юнита: LTV/CAC часто ≥ 3"
     },
     {
         "id": "uc6",
         "title": "Payback в месяцах",
-        "brief": "CAC = 600 ₽. Маржа с платящего в месяц (contribution) = 150 ₽. За сколько месяцев окупится CAC?",
+        "brief": "Даны CAC и месячная маржа с платящего. Найдите Payback.",
         "icon": "⏳",
         "given": [
             {
@@ -206,7 +206,7 @@ const UNIT_CALC_SCENARIOS = [
             },
             {
                 "key": "marginMonth",
-                "label": "Маржа / мес. с платящего",
+                "label": "Contribution / мес.",
                 "value": 150,
                 "unit": "₽"
             }
@@ -215,34 +215,34 @@ const UNIT_CALC_SCENARIOS = [
             {
                 "key": "payback",
                 "label": "Payback, мес.",
-                "formula": "Payback = CAC / Monthly margin",
+                "formula": "Payback",
                 "answer": 4,
                 "hint": "600 / 150 = 4 месяца"
             }
         ],
-        "sheetHint": "Скорость возврата инвестиций в привлечение"
+        "sheetHint": "Срок окупаемости CAC"
     },
     {
         "id": "uc7",
         "title": "Blended CAC врёт",
-        "brief": "Paid: 10 000 юзеров, spend 100 000 ₽, C1=10%. Free: 40 000 юзеров, spend 0, C1=10%. Посчитайте blended CAC на платящего и CAC только paid.",
+        "brief": "Paid и free каналы с разными Users и одним Spend на paid. Найдите CAC paid и Blended CAC на платящего.",
         "icon": "🔀",
         "given": [
             {
                 "key": "paidUsers",
-                "label": "Paid пользователи",
+                "label": "Users (paid)",
                 "value": 10000,
                 "unit": ""
             },
             {
                 "key": "freeUsers",
-                "label": "Free пользователи",
+                "label": "Users (free)",
                 "value": 40000,
                 "unit": ""
             },
             {
                 "key": "spend",
-                "label": "Spend paid",
+                "label": "Spend (paid)",
                 "value": 100000,
                 "unit": "₽"
             },
@@ -257,25 +257,25 @@ const UNIT_CALC_SCENARIOS = [
         "ask": [
             {
                 "key": "cacPaid",
-                "label": "CAC paid (на платящего), ₽",
-                "formula": "CAC_paid = Spend / (PaidUsers × C1)",
+                "label": "CAC paid, ₽",
+                "formula": "CAC paid",
                 "answer": 100,
                 "hint": "100 000 / 1 000 = 100"
             },
             {
                 "key": "cacBlended",
-                "label": "Blended CAC (на платящего), ₽",
-                "formula": "CAC_blended = Spend / ((Paid+Free) × C1)",
+                "label": "Blended CAC, ₽",
+                "formula": "Blended CAC",
                 "answer": 20,
-                "hint": "100 000 / 5 000 = 20 — выглядит «красиво», но paid убыточнее"
+                "hint": "100 000 / 5 000 = 20 — blended занижает дорогой канал"
             }
         ],
-        "sheetHint": "Строки paid / free / все пользователи в вашей таблице"
+        "sheetHint": "Строки paid / free / все пользователи"
     },
     {
         "id": "uc8",
-        "title": "Прибыль на привлечённого",
-        "brief": "ARPU = 68,4 ₽, CPA (стоимость привлечения пользователя) = 10 ₽. Сколько прибыли с одного привлечённого?",
+        "title": "Юнит на привлечённого",
+        "brief": "Даны ARPU и CPA. Найдите юнит на одного привлечённого пользователя.",
         "icon": "➕",
         "given": [
             {
@@ -286,7 +286,7 @@ const UNIT_CALC_SCENARIOS = [
             },
             {
                 "key": "cpa",
-                "label": "CPA / CPUser",
+                "label": "CPA",
                 "value": 10,
                 "unit": "₽"
             }
@@ -294,23 +294,23 @@ const UNIT_CALC_SCENARIOS = [
         "ask": [
             {
                 "key": "profitPerUser",
-                "label": "ARPU − CPA, ₽",
-                "formula": "Profit per acquired = ARPU − CPA",
+                "label": "Unit, ₽",
+                "formula": "Unit",
                 "answer": 58.4,
                 "hint": "68,4 − 10 = 58,4"
             }
         ],
-        "sheetHint": "Колонка ARPU−CPA в таблице"
+        "sheetHint": "Юнит на привлечённого после CPA"
     },
     {
         "id": "uc9",
         "title": "ROI привлечения",
-        "brief": "На поток потратили 80 000 ₽. Валовая прибыль с потока после COGS = 240 000 ₽. Какой ROI?",
+        "brief": "Даны Gross Profit с потока и Acq Costs. Найдите ROI как долю (не проценты).",
         "icon": "📈",
         "given": [
             {
                 "key": "profit",
-                "label": "Gross Profit с потока",
+                "label": "Gross Profit",
                 "value": 240000,
                 "unit": "₽"
             },
@@ -324,41 +324,41 @@ const UNIT_CALC_SCENARIOS = [
         "ask": [
             {
                 "key": "roi",
-                "label": "ROI (доля, не %)",
-                "formula": "ROI = (Profit − Spend) / Spend",
+                "label": "ROI",
+                "formula": "ROI",
                 "answer": 2,
                 "hint": "(240 000 − 80 000) / 80 000 = 2 → 200%"
             }
         ],
-        "sheetHint": "Возврат на инвестиции в привлеч. пользователей"
+        "sheetHint": "ROI привлечения"
     },
     {
         "id": "uc10",
         "title": "Какой рычаг сильнее?",
-        "brief": "Сравниваем юнит платящего после привлечения: Contribution LTV − CAC. База: маржинальный LTV платящего 360 ₽, CAC 100 ₽. A) только C1 ×3. B) CAC снижаем до 50 ₽. C) LTV поднимаем до 540 ₽. Посчитайте юнит в каждом сценарии.",
+        "brief": "База: Contribution LTV платящего и CAC. Сценарий A — меняется только C1. B — новый CAC. C — новый LTV. Найдите юнит платящего в каждом сценарии.",
         "icon": "🦾",
         "given": [
             {
                 "key": "ltvBase",
-                "label": "База: Contribution LTV платящего",
+                "label": "LTV (база)",
                 "value": 360,
                 "unit": "₽"
             },
             {
                 "key": "cacBase",
-                "label": "База: CAC",
+                "label": "CAC (база)",
                 "value": 100,
                 "unit": "₽"
             },
             {
                 "key": "cacB",
-                "label": "Сценарий B: новый CAC",
+                "label": "CAC (B)",
                 "value": 50,
                 "unit": "₽"
             },
             {
                 "key": "ltvC",
-                "label": "Сценарий C: новый LTV",
+                "label": "LTV (C)",
                 "value": 540,
                 "unit": "₽"
             },
@@ -367,32 +367,32 @@ const UNIT_CALC_SCENARIOS = [
                 "label": "Сценарий A",
                 "value": 0,
                 "unit": "",
-                "display": "C1 ×3 — юнит платящего не меняет"
+                "display": "C1 ×3"
             }
         ],
         "ask": [
             {
                 "key": "unitA",
-                "label": "A) LTV − CAC, ₽",
-                "formula": "C1 меняет объём, не юнит платящего → как база: 360 − 100",
+                "label": "Unit A, ₽",
+                "formula": "Unit A",
                 "answer": 260,
-                "hint": "360 − 100 = 260"
+                "hint": "C1 не меняет юнит платящего: 360 − 100 = 260"
             },
             {
                 "key": "unitB",
-                "label": "B) LTV − CAC, ₽",
-                "formula": "LTV − CAC = 360 − 50",
+                "label": "Unit B, ₽",
+                "formula": "Unit B",
                 "answer": 310,
                 "hint": "360 − 50 = 310"
             },
             {
                 "key": "unitC",
-                "label": "C) LTV − CAC, ₽",
-                "formula": "LTV − CAC = 540 − 100",
+                "label": "Unit C, ₽",
+                "formula": "Unit C",
                 "answer": 440,
-                "hint": "540 − 100 = 440 — самый сильный рычаг здесь"
+                "hint": "540 − 100 = 440 — сильнее остальных"
             }
         ],
-        "sheetHint": "Сравнивайте Contribution LTV − CAC, не сырую выручку − CAC"
+        "sheetHint": "Сравнивайте Contribution LTV и CAC по сценариям"
     }
 ];

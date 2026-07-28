@@ -1,15 +1,19 @@
 /**
- * Строит js/question-skills.js: questionId → skillId[].
- * Скилы = пункты TOPIC_COMPETENCIES с id вида metrics.middle.know.0
+ * Собирает js/question-skills.js.
+ *
+ * Источник истины: data/question-skills.json (ручная привязка questionId → skillId[]).
+ * Эвристика заполняет только вопросы без записи в JSON.
+ * Опционально: data/question-skills-overrides.json поверх базы.
+ *
+ * Правка привязок: редактируйте data/question-skills.json, затем:
+ *   node scripts/build-question-skills.mjs
  */
-import { readFileSync, writeFileSync } from "fs";
+import { readFileSync, writeFileSync, existsSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { createRequire } from "module";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-// Подгружаем TOPIC_COMPETENCIES через временный eval содержимого levels.js — только константу.
 const levelsSrc = readFileSync(join(root, "js/levels.js"), "utf8");
 const match = levelsSrc.match(/const TOPIC_COMPETENCIES = (\{[\s\S]*?\n\});/);
 if (!match) throw new Error("TOPIC_COMPETENCIES not found");
@@ -48,7 +52,7 @@ function allSkills() {
     return out;
 }
 
-/** Ключевые слова → skill index hints (по теме). Порядок: более специфичные раньше. */
+/** Эвристика — только для новых вопросов без записи в JSON. */
 const RULES = {
     Метрики: [
         { skill: "metrics.middle.know.3", re: /north star|nsm|omtm|one metric/i },
@@ -150,14 +154,22 @@ const DEFAULT_BY_TOPIC = {
     CustDev: ["custdev.middle.know.0", "custdev.middle.know.1"]
 };
 
-const qRaw = readFileSync(join(root, "js/questions.js"), "utf8");
-const QUESTIONS = JSON.parse(qRaw.slice(qRaw.indexOf("["), qRaw.lastIndexOf("]") + 1));
+function loadJsonMap(path) {
+    if (!existsSync(path)) return {};
+    const raw = JSON.parse(readFileSync(path, "utf8"));
+    const out = {};
+    for (const [k, v] of Object.entries(raw)) {
+        if (!Array.isArray(v)) continue;
+        out[String(k)] = [...new Set(v.map(String))];
+    }
+    return out;
+}
 
-const map = {};
-let matched = 0;
-let fallback = 0;
+function hasOwn(obj, key) {
+    return Object.prototype.hasOwnProperty.call(obj, key);
+}
 
-for (const q of QUESTIONS) {
+function heuristicSkills(q) {
     const text = `${q.question} ${q.explanation || ""}`;
     const rules = RULES[q.topic] || [];
     const hits = [];
@@ -165,17 +177,82 @@ for (const q of QUESTIONS) {
         if (rule.re.test(text)) hits.push(rule.skill);
         if (hits.length >= 2) break;
     }
-    if (hits.length) {
-        map[q.id] = [...new Set(hits)];
-        matched++;
-    } else {
-        map[q.id] = DEFAULT_BY_TOPIC[q.topic] || [];
-        fallback++;
+    if (hits.length) return [...new Set(hits)];
+    return DEFAULT_BY_TOPIC[q.topic] || [];
+}
+
+const manualPath = join(root, "data/question-skills.json");
+const overridesPath = join(root, "data/question-skills-overrides.json");
+const manual = loadJsonMap(manualPath);
+const overrides = loadJsonMap(overridesPath);
+
+const qRaw = readFileSync(join(root, "js/questions.js"), "utf8");
+const QUESTIONS = JSON.parse(qRaw.slice(qRaw.indexOf("["), qRaw.lastIndexOf("]") + 1));
+
+const map = {};
+let fromManual = 0;
+let fromHeuristic = 0;
+let fromOverride = 0;
+
+for (const q of QUESTIONS) {
+    const key = String(q.id);
+    if (hasOwn(overrides, key)) {
+        map[key] = overrides[key];
+        fromOverride++;
+        continue;
     }
+    if (hasOwn(manual, key)) {
+        map[key] = manual[key];
+        fromManual++;
+        continue;
+    }
+    map[key] = heuristicSkills(q);
+    fromHeuristic++;
+}
+
+// Новые вопросы из эвристики — дописываем в JSON, чтобы дальше править вручную
+let manualUpdated = false;
+const nextManual = { ...manual };
+for (const q of QUESTIONS) {
+    const key = String(q.id);
+    if (!hasOwn(nextManual, key) && map[key]?.length) {
+        nextManual[key] = map[key];
+        manualUpdated = true;
+    }
+}
+if (manualUpdated || !existsSync(manualPath)) {
+    const sorted = {};
+    for (const k of Object.keys(nextManual).sort((a, b) => Number(a) - Number(b))) {
+        sorted[k] = nextManual[k];
+    }
+    writeFileSync(manualPath, JSON.stringify(sorted, null, 2) + "\n");
 }
 
 const catalog = allSkills();
-const out = `/** Автогенерация: node scripts/build-question-skills.mjs */
+const validSkillIds = new Set(catalog.map((s) => s.id));
+const invalidRefs = [];
+for (const [qid, ids] of Object.entries(map)) {
+    const cleaned = ids.filter((id) => validSkillIds.has(id));
+    if (cleaned.length !== ids.length) {
+        invalidRefs.push({
+            questionId: qid,
+            ids: ids.filter((id) => !validSkillIds.has(id))
+        });
+    }
+    map[qid] = cleaned;
+}
+
+if (invalidRefs.length) {
+    throw new Error(
+        `Invalid skill ids in manual map: ${invalidRefs
+            .map((row) => `${row.questionId} → ${row.ids.join(", ")}`)
+            .join("; ")}`
+    );
+}
+
+const out = `/** Сборка: node scripts/build-question-skills.mjs
+ * Источник: data/question-skills.json (+ overrides). Эвристика — только для новых id.
+ */
 const QUESTION_SKILLS = ${JSON.stringify(map, null, 4)};
 
 const SKILL_CATALOG = ${JSON.stringify(catalog, null, 4)};
@@ -196,4 +273,11 @@ function getQuestionsForSkill(skillId) {
 `;
 
 writeFileSync(join(root, "js/question-skills.js"), out);
-console.log({ questions: QUESTIONS.length, matched, fallback, skills: catalog.length });
+console.log({
+    questions: QUESTIONS.length,
+    fromManual,
+    fromOverride,
+    fromHeuristic,
+    invalidSkillRefs: invalidRefs.length,
+    skills: catalog.length
+});

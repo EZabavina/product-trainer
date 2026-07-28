@@ -331,7 +331,9 @@ function getTopicQuizSessions(topicName) {
             s.topic === topicName &&
             s.quizType !== "interview" &&
             s.quizType !== "mistakes" &&
+            s.quizType !== "practice" &&
             s.quizType !== "unit-calc" &&
+            s.quizType !== "unit-lab" &&
             typeof s.score === "number" &&
             typeof s.total === "number"
     );
@@ -469,7 +471,7 @@ function getGradeSnapshots() {
     });
 }
 
-function renderSkillItemsList(items, emptyText) {
+function renderSkillItemsList(items, emptyText, { practice = false } = {}) {
     if (!items.length) {
         return `<p class="grade-empty">${escapeHtml(emptyText)}</p>`;
     }
@@ -490,11 +492,35 @@ function renderSkillItemsList(items, emptyText) {
                 : item.source === "threshold"
                   ? `<span class="skill-evidence"> · по порогу %</span>`
                   : "";
-        parts.push(`<li>${escapeHtml(item.text)}${via}</li>`);
+        let practiceBtn = "";
+        if (practice && item.id && typeof getQuestionsForSkill === "function") {
+            const qids = getQuestionsForSkill(item.id).slice(0, 8);
+            if (qids.length) {
+                const label = `Скил`;
+                practiceBtn = ` <button type="button" class="btn-text practice-inline" data-practice-ids='${JSON.stringify(qids)}' data-practice-label="${label}" data-practice-length="standard">потренировать ${qids.length}</button>`;
+            }
+        }
+        parts.push(`<li>${escapeHtml(item.text)}${via}${practiceBtn}</li>`);
     });
     if (currentTag !== null) parts.push("</ul>");
 
     return parts.join("");
+}
+
+function collectPracticeIdsForSkills(skills, limit = 8) {
+    const seen = new Set();
+    const ids = [];
+    for (const skill of skills || []) {
+        const sid = skill.id || skill;
+        if (!sid || typeof getQuestionsForSkill !== "function") continue;
+        for (const qid of getQuestionsForSkill(sid)) {
+            if (seen.has(qid)) continue;
+            seen.add(qid);
+            ids.push(qid);
+            if (ids.length >= limit) return ids;
+        }
+    }
+    return ids;
 }
 
 function renderTopicDetailHtml(s) {
@@ -503,7 +529,14 @@ function renderTopicDetailHtml(s) {
         return `<p class="grade-empty">Пройдите квиз по теме, чтобы увидеть закрытые скилы и пробелы.</p>`;
     }
 
+    const gapIds = collectPracticeIdsForSkills(s.gaps, 8);
+    const practiceAll =
+        gapIds.length > 0
+            ? `<button type="button" class="btn btn-primary practice-cta" data-practice-ids='${JSON.stringify(gapIds)}' data-practice-label="Пробелы · ${escapeHtml(s.topic.name)}" data-practice-length="standard">Потренировать пробелы · ${gapIds.length}</button>`
+            : "";
+
     return `
+        <div class="grade-detail-actions">${practiceAll}</div>
         <div class="grade-split">
             <div class="grade-col grade-col-known">
                 <h4 class="grade-col-title">Знает / умеет</h4>
@@ -511,7 +544,7 @@ function renderTopicDetailHtml(s) {
             </div>
             <div class="grade-col grade-col-gaps">
                 <h4 class="grade-col-title">Пробелы</h4>
-                ${renderSkillItemsList(s.gaps, "Пробелов нет по текущей шкале")}
+                ${renderSkillItemsList(s.gaps, "Пробелов нет по текущей шкале", { practice: true })}
             </div>
         </div>
     `;
@@ -687,6 +720,7 @@ function renderGradesSectionHtml() {
                 сначала по ответам на вопросы, привязанные к скилу; если ответов ещё нет — по порогу %.
                 Колонка «Лучшая попытка» — верные и ошибки из лучшего квиза темы.
                 Общий уровень = среднее лучших % по <strong>всем</strong> темам (непройденные = 0%).
+                Из пробелов можно сразу потренировать связанные вопросы.
             </p>
             ${renderSkillsLegendHtml()}
         </div>
@@ -760,7 +794,7 @@ function buildLearnNextRecommendation({ topic, percent, wrongAnswers = [], quizT
         });
     });
 
-    const topicName = quizType === "mistakes" ? null : topic;
+    const topicName = quizType === "mistakes" || quizType === "practice" ? null : topic;
     const split =
         topicName && percent != null
             ? splitCompetenciesByPercent(topicName, percent)
@@ -783,10 +817,10 @@ function buildLearnNextRecommendation({ topic, percent, wrongAnswers = [], quizT
             : [];
 
     let lead;
-    if (quizType === "mistakes") {
+    if (quizType === "mistakes" || quizType === "practice") {
         lead =
             percent === 100
-                ? "Все ошибки в раунде закрыты. Дальше — слабые скилы по таблице или другой теме."
+                ? "Подборка закрыта. Дальше — слабые скилы по таблице или другой теме."
                 : "Сфокусируйтесь на скилах ниже — по ним были ошибки в этом раунде.";
     } else if (percent >= 80) {
         lead = "Тема в целом закрыта. Для роста дотяните оставшиеся пробелы Senior.";
@@ -811,6 +845,15 @@ function renderLearnNextHtml(rec) {
         .map((b) => `<li>${escapeHtml(b)}</li>`)
         .join("");
 
+    const practiceIds =
+        typeof collectPracticeIdsForSkills === "function"
+            ? collectPracticeIdsForSkills(rec.focusSkills, 5)
+            : [];
+    const practiceBtn =
+        practiceIds.length > 0
+            ? `<button type="button" class="btn btn-primary practice-cta" data-practice-ids='${JSON.stringify(practiceIds)}' data-practice-label="Подтянуть скилы" data-practice-length="standard">Потренировать эти ${practiceIds.length}</button>`
+            : "";
+
     return `
         <div class="learn-next">
             <p class="learn-next-lead">${escapeHtml(rec.lead)}</p>
@@ -819,6 +862,7 @@ function renderLearnNextHtml(rec) {
                     ? `<h4 class="learn-next-title">Скилы на подтягивание</h4><ul class="learn-next-list">${skillLis}</ul>`
                     : ""
             }
+            ${practiceBtn}
             ${
                 bulletLis
                     ? `<h4 class="learn-next-title">Шпаргалка${rec.cheatTopic ? `: ${escapeHtml(rec.cheatTopic)}` : ""}</h4><ul class="learn-next-cheats">${bulletLis}</ul>`

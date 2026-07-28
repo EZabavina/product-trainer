@@ -2491,3 +2491,187 @@ body::before {
         grid-template-columns: 1fr;
     }
 }
+
+/* Unit economics lab 2.0 */
+.ul-layout {
+    display: grid;
+    gap: 16px;
+    max-width: 960px;
+    margin: 0 auto;
+}
+
+.ul-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+}
+
+.ul-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 4px;
+}
+
+.ul-title {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.ul-lead {
+    margin: 0 0 16px;
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+
+.ul-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+}
+
+.ul-panel-title {
+    margin: 0 0 10px;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+.ul-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.ul-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ul-field-label {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.ul-input {
+    font: inherit;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--text);
+}
+
+.ul-input:focus {
+    outline: none;
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+}
+
+.ul-outs {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ul-out {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid transparent;
+}
+
+.ul-out-label {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+}
+
+.ul-out-value {
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+}
+
+.ul-card-challenge {
+    border-color: rgba(56, 189, 248, 0.28);
+}
+
+.ul-ch-title {
+    margin: 0 0 8px;
+    font-size: 1.1rem;
+}
+
+.ul-ch-prompt {
+    margin: 0 0 12px;
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+
+.ul-gate {
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    color: #fbbf24;
+    font-size: 0.9rem;
+}
+
+.ul-ch-feedback {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+}
+
+.ul-ch-ok {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.ul-ch-bad {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.ul-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+}
+
+.ul-done {
+    margin: 0;
+    font-size: 1.05rem;
+}
+
+.practice-cta {
+    margin: 8px 0 0;
+}
+
+.grade-detail-actions {
+    margin-bottom: 12px;
+}
+
+.practice-inline {
+    margin-left: 6px;
+    font-size: 0.8rem;
+    vertical-align: baseline;
+}
+
+.learn-next .practice-cta {
+    margin-top: 12px;
+}
+
+@media (max-width: 700px) {
+    .ul-grid {
+        grid-template-columns: 1fr;
+    }
+}

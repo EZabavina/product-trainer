@@ -61,6 +61,7 @@ function formatCalcValue(item) {
 
 function startUnitCalc(lengthId = "standard") {
     if (!getUnitCalcScenarioCount()) return;
+    if (typeof enterActiveSession === "function") enterActiveSession();
 
     const all = [...UNIT_CALC_SCENARIOS];
     const size = getSessionSize(all.length, lengthId);
@@ -82,6 +83,7 @@ function startUnitCalc(lengthId = "standard") {
     document.getElementById("results-screen")?.classList.add("hidden");
     document.getElementById("interview-screen")?.classList.add("hidden");
     document.getElementById("interview-debrief-screen")?.classList.add("hidden");
+    document.getElementById("unit-lab-screen")?.classList.add("hidden");
     unitCalcScreen.classList.remove("hidden");
     document.querySelector(".nav-tabs")?.classList.add("hidden");
 

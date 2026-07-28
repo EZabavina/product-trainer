@@ -203,6 +203,42 @@
                 </div>
             </div>
 
+            <div id="unit-lab-screen" class="hidden">
+                <div class="quiz-top">
+                    <button class="btn-ghost" id="unit-lab-back">← Назад</button>
+                    <div class="quiz-meta">
+                        <span class="quiz-topic-badge" id="unit-lab-badge"></span>
+                        <span class="quiz-progress" id="unit-lab-progress"></span>
+                    </div>
+                </div>
+                <div class="ul-layout">
+                    <section class="ul-card">
+                        <div class="ul-card-head">
+                            <h2 class="ul-title">Модель юнита</h2>
+                            <button type="button" class="btn-text" id="unit-lab-reset">Сбросить</button>
+                        </div>
+                        <p class="ul-lead">Меняйте входы — справа пересчитаются метрики, как в строке Sheets.</p>
+                        <div class="ul-grid">
+                            <div>
+                                <h3 class="ul-panel-title">Входы</h3>
+                                <div class="ul-fields" id="unit-lab-inputs"></div>
+                            </div>
+                            <div>
+                                <h3 class="ul-panel-title">Выходы</h3>
+                                <div class="ul-outs" id="unit-lab-outputs"></div>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="ul-card ul-card-challenge">
+                        <div id="unit-lab-challenge"></div>
+                        <div class="ul-actions">
+                            <button type="button" class="btn btn-primary" id="unit-lab-check">Проверить</button>
+                            <button type="button" class="btn btn-primary hidden" id="unit-lab-next">Далее →</button>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
             <!-- Юнит-экономика: расчёты -->
             <div id="unit-calc-screen" class="hidden">
                 <div class="quiz-top">
@@ -291,6 +327,7 @@
     <script src="js/interview.js"></script>
     <script src="js/unit-calc-scenarios.js"></script>
     <script src="js/unit-calc.js"></script>
+    <script src="js/unit-lab.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

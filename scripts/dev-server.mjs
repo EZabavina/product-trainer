@@ -37,13 +37,23 @@ const MIME = {
 const port = Number(process.env.PORT) || 8080;
 
 function serveStatic(pathname, res) {
-    let filePath = join(root, pathname === "/" ? "index.html" : pathname);
+    const relativePath = decodeURIComponent(pathname).replace(/^\/+/, "") || "index.html";
+    let filePath = join(root, relativePath);
     if (!filePath.startsWith(root)) {
         res.writeHead(403);
         res.end();
         return;
     }
     if (!existsSync(filePath) || statSync(filePath).isDirectory()) {
+        const isAsset = extname(pathname) !== "";
+        if (!isAsset && !pathname.startsWith("/api/")) {
+            const spaEntry = join(root, "index.html");
+            if (existsSync(spaEntry)) {
+                res.writeHead(200, { "Content-Type": MIME[".html"] });
+                res.end(readFileSync(spaEntry));
+                return;
+            }
+        }
         res.writeHead(404);
         res.end("Not found");
         return;
@@ -133,5 +143,6 @@ server.on("error", (err) => {
 
 server.listen(port, () => {
     console.log(`Dev server: http://localhost:${port}`);
+    console.log(`Train deeplinks: /train/quiz/fin/?length=15 (нужен npm run dev, не python -m http.server)`);
     console.log(`API key: ${process.env.OPENROUTER_API_KEY ? "loaded" : "MISSING — add .env"}`);
 });

@@ -43,11 +43,18 @@ const TOPIC_CONFIG = [
                 "description": "50 вопросов по теории юнит-экономики"
             },
             {
+                "id": "lab",
+                "label": "Лаб",
+                "icon": "🧪",
+                "type": "lab",
+                "description": "Живая модель: меняешь CAC → видишь ROI"
+            },
+            {
                 "id": "calc",
                 "label": "Расчёты",
                 "icon": "🧮",
                 "type": "calc",
-                "description": "10 заданий: посчитай Buyers, CAC, ARPU, ROI"
+                "description": "10 отдельных заданий на формулы"
             }
         ]
     },
