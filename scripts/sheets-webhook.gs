@@ -13,9 +13,12 @@
  * 4. После правок кода — новое развёртывание (новая версия) или
  *    «Управлять развёртываниями» → карандаш → Новая версия.
  *
- * Лист "events" создаётся автоматически. При обновлении скрипта
- * колонки questionText / selectedText / correctText вставляются после
- * selectedIndex (а не в конец листа).
+ * Если колонок questionText / selectedText / correctText нет:
+ *   выберите функцию fixHeaders → Выполнить (один раз),
+ *   затем снова сделайте Новую версию развёртывания.
+ *
+ * Важно: Sheet.getRange(row, column, numRows, numColumns) —
+ * 3-й и 4-й аргументы это РАЗМЕР, не конечная ячейка.
  */
 
 var SHEET_NAME = "events";
@@ -45,18 +48,21 @@ function normalizeHeader(value) {
   return String(value || "").trim();
 }
 
+/** Диапазон 1×N начиная с колонки startCol (1-based). */
+function headerRange(sheet, startCol, numCols) {
+  return sheet.getRange(1, startCol, 1, numCols);
+}
+
 function readHeaderRow(sheet) {
   if (sheet.getLastRow() === 0 || sheet.getLastColumn() === 0) {
     return [];
   }
-  return sheet
-    .getRange(1, 1, 1, sheet.getLastColumn())
-    .getValues()[0]
-    .map(normalizeHeader);
+  var width = Math.max(sheet.getLastColumn(), EVENT_HEADERS.length);
+  return headerRange(sheet, 1, width).getValues()[0].map(normalizeHeader);
 }
 
 function headersMatch(existing, expected) {
-  if (existing.length !== expected.length) {
+  if (existing.length < expected.length) {
     return false;
   }
   for (var i = 0; i < expected.length; i++) {
@@ -67,24 +73,23 @@ function headersMatch(existing, expected) {
   return true;
 }
 
-function isBrokenTrailingHeaderMigration(existing) {
-  return (
-    existing.length >= EVENT_HEADERS.length &&
-    normalizeHeader(existing[6]) === "topic" &&
-    normalizeHeader(existing[15]) === "total" &&
-    normalizeHeader(existing[16]) === "percent" &&
-    normalizeHeader(existing[17]) === "source"
-  );
+function headerIndex(existing, name) {
+  for (var i = 0; i < existing.length; i++) {
+    if (normalizeHeader(existing[i]) === name) {
+      return i;
+    }
+  }
+  return -1;
 }
 
 /**
  * Приводит лист к актуальной схеме колонок.
- * - старая схема (15 колонок, topic на позиции 7): вставляет 3 колонки после selectedIndex
- * - ошибочная миграция (дубли total/percent/source в конце): правит заголовки и удаляет хвост
+ * Всегда гарантирует наличие questionText / selectedText / correctText
+ * сразу после selectedIndex.
  */
 function ensureEventHeaders(sheet) {
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(EVENT_HEADERS);
+  if (sheet.getLastRow() === 0 || sheet.getLastColumn() === 0) {
+    headerRange(sheet, 1, EVENT_HEADERS.length).setValues([EVENT_HEADERS]);
     return;
   }
 
@@ -93,32 +98,52 @@ function ensureEventHeaders(sheet) {
     return;
   }
 
-  if (normalizeHeader(existing[6]) === "questionText") {
-    if (existing.length < EVENT_HEADERS.length) {
-      sheet
-        .getRange(1, existing.length + 1, 1, EVENT_HEADERS.length)
-        .setValues([EVENT_HEADERS.slice(existing.length)]);
-    }
-    return;
-  }
+  var textIdx = headerIndex(existing, "questionText");
+  var topicIdx = headerIndex(existing, "topic");
+  var selectedIdx = headerIndex(existing, "selectedIndex");
 
-  if (isBrokenTrailingHeaderMigration(existing)) {
-    sheet.getRange(1, 7, 1, 9).setValues([["questionText", "selectedText", "correctText"]]);
+  // Ошибочная миграция: topic всё ещё на месте 7, а в хвосте дубли total/percent/source
+  if (
+    textIdx < 0 &&
+    topicIdx === 6 &&
+    existing.length >= EVENT_HEADERS.length &&
+    normalizeHeader(existing[15]) === "total" &&
+    normalizeHeader(existing[16]) === "percent" &&
+    normalizeHeader(existing[17]) === "source"
+  ) {
+    headerRange(sheet, 7, 3).setValues([["questionText", "selectedText", "correctText"]]);
     if (existing.length > EVENT_HEADERS.length) {
-      sheet.getRange(1, EVENT_HEADERS.length + 1, 1, existing.length).clearContent();
+      headerRange(sheet, EVENT_HEADERS.length + 1, existing.length - EVENT_HEADERS.length).clearContent();
     }
+    headerRange(sheet, 1, EVENT_HEADERS.length).setValues([EVENT_HEADERS]);
     return;
   }
 
-  if (normalizeHeader(existing[6]) === "topic" && existing.length <= 15) {
-    sheet.insertColumns(7, 3);
-    sheet.getRange(1, 7, 1, 9).setValues([["questionText", "selectedText", "correctText"]]);
-    return;
+  // Старая схема без текстовых колонок: вставляем 3 колонки после selectedIndex
+  if (textIdx < 0) {
+    var insertAt = selectedIdx >= 0 ? selectedIdx + 2 : 7; // 1-based column index
+    sheet.insertColumns(insertAt, 3);
+    headerRange(sheet, insertAt, 3).setValues([["questionText", "selectedText", "correctText"]]);
   }
 
-  if (existing.length === EVENT_HEADERS.length) {
-    sheet.getRange(1, 1, 1, EVENT_HEADERS.length).setValues([EVENT_HEADERS]);
+  // Финально выравниваем заголовки под канонический порядок
+  headerRange(sheet, 1, EVENT_HEADERS.length).setValues([EVENT_HEADERS]);
+}
+
+/**
+ * Ручной запуск из редактора Apps Script:
+ * выбрать fixHeaders → Выполнить.
+ */
+function fixHeaders() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) {
+    throw new Error("Open Apps Script from the Sheet (Extensions → Apps Script).");
   }
+  var sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
+  }
+  ensureEventHeaders(sheet);
 }
 
 function doPost(e) {
