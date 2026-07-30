@@ -279,6 +279,7 @@ function renderUnitLabChallenge(model) {
 
     btnUnitLabCheck?.classList.remove("hidden");
     btnUnitLabNext?.classList.add("hidden");
+    syncUnitLabCheckEnabled();
     document.getElementById("unit-lab-answer")?.focus();
 
     const actionsEl = document.querySelector("#unit-lab-screen .ul-actions");
@@ -287,7 +288,42 @@ function renderUnitLabChallenge(model) {
     }
 }
 
+function isUnitLabAnswerEmpty() {
+    const input = document.getElementById("unit-lab-answer");
+    return !String(input?.value || "").trim();
+}
+
+function syncUnitLabCheckEnabled() {
+    if (!btnUnitLabCheck || unitLabChecked) return;
+    btnUnitLabCheck.disabled = isUnitLabAnswerEmpty();
+}
+
+function showUnitLabEmptyError() {
+    const input = document.getElementById("unit-lab-answer");
+    input?.classList.add("ul-input-bad");
+    const fb = document.getElementById("unit-lab-feedback");
+    if (fb) {
+        fb.classList.remove("hidden");
+        fb.className = "ul-ch-feedback ul-ch-bad";
+        fb.textContent = "❌ Введите ответ — поле пустое.";
+    }
+    input?.focus();
+}
+
 function onUnitLabInputChange(e) {
+    const answerInput = e.target.closest("#unit-lab-answer");
+    if (answerInput) {
+        if (!unitLabChecked) {
+            answerInput.classList.remove("ul-input-bad");
+            const fb = document.getElementById("unit-lab-feedback");
+            if (fb && isUnitLabAnswerEmpty() === false) {
+                fb.classList.add("hidden");
+            }
+            syncUnitLabCheckEnabled();
+        }
+        return;
+    }
+
     const input = e.target.closest("[data-lab-key]");
     if (!input) return;
     const key = input.dataset.labKey;
@@ -321,6 +357,12 @@ function checkUnitLabChallenge() {
             fb.className = "ul-ch-feedback ul-ch-bad";
             fb.textContent = "Условие в модели ещё не выполнено.";
         }
+        return;
+    }
+
+    if (isUnitLabAnswerEmpty()) {
+        showUnitLabEmptyError();
+        syncUnitLabCheckEnabled();
         return;
     }
 
@@ -460,6 +502,7 @@ btnUnitLabNext?.addEventListener("click", () => {
     }
 });
 unitLabInputsEl?.addEventListener("input", onUnitLabInputChange);
+unitLabChallenge?.addEventListener("input", onUnitLabInputChange);
 unitLabChallenge?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
         e.preventDefault();

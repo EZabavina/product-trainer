@@ -66,25 +66,29 @@
                 <div class="mode-picker-backdrop" id="quiz-setup-backdrop"></div>
                 <div class="mode-picker-card mode-picker-card-wide">
                     <button type="button" class="mode-picker-close" id="quiz-setup-close" aria-label="Закрыть">×</button>
-                    <div class="mode-picker-header" id="quiz-setup-header"></div>
-                    <p class="mode-picker-sub" id="quiz-setup-sub"></p>
-                    <div class="quiz-setup-section hidden" id="setup-format-section">
-                        <h3 class="setup-section-title">Формат</h3>
-                        <div class="mode-picker-options" id="setup-format-options"></div>
+                    <div class="mode-picker-scroll">
+                        <div class="mode-picker-header" id="quiz-setup-header"></div>
+                        <p class="mode-picker-sub" id="quiz-setup-sub"></p>
+                        <div class="quiz-setup-section hidden" id="setup-format-section">
+                            <h3 class="setup-section-title">Формат</h3>
+                            <div class="mode-picker-options" id="setup-format-options"></div>
+                        </div>
+                        <div class="quiz-setup-section hidden" id="setup-filter-section">
+                            <h3 class="setup-section-title">Тема</h3>
+                            <div class="setup-chips" id="setup-filter-options"></div>
+                        </div>
+                        <div class="quiz-setup-section" id="setup-length-section">
+                            <h3 class="setup-section-title">Длина раунда</h3>
+                            <div class="setup-length-grid" id="setup-length-options"></div>
+                        </div>
+                        <div class="quiz-setup-section hidden" id="setup-scenario-section">
+                            <h3 class="setup-section-title">Сценарий</h3>
+                            <div class="mode-picker-options mode-picker-options-stack" id="setup-scenario-options"></div>
+                        </div>
                     </div>
-                    <div class="quiz-setup-section hidden" id="setup-filter-section">
-                        <h3 class="setup-section-title">Тема</h3>
-                        <div class="setup-chips" id="setup-filter-options"></div>
+                    <div class="mode-picker-footer">
+                        <button type="button" class="btn btn-primary setup-start-btn" id="setup-start">Начать</button>
                     </div>
-                <div class="quiz-setup-section" id="setup-length-section">
-                        <h3 class="setup-section-title">Длина раунда</h3>
-                        <div class="setup-length-grid" id="setup-length-options"></div>
-                    </div>
-                    <div class="quiz-setup-section hidden" id="setup-scenario-section">
-                        <h3 class="setup-section-title">Сценарий</h3>
-                        <div class="mode-picker-options" id="setup-scenario-options"></div>
-                    </div>
-                    <button type="button" class="btn btn-primary setup-start-btn" id="setup-start">Начать</button>
                 </div>
             </div>
 
@@ -254,7 +258,6 @@
                 <div class="uc-card">
                     <h2 class="uc-title" id="unit-calc-title"></h2>
                     <p class="uc-brief" id="unit-calc-brief"></p>
-                    <p class="uc-sheet-hint" id="unit-calc-sheet-hint"></p>
                     <div class="uc-columns">
                         <section class="uc-panel">
                             <h3 class="uc-panel-title">Дано</h3>

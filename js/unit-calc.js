@@ -18,7 +18,6 @@ const unitCalcBrief = document.getElementById("unit-calc-brief");
 const unitCalcGiven = document.getElementById("unit-calc-given");
 const unitCalcAsk = document.getElementById("unit-calc-ask");
 const unitCalcFeedback = document.getElementById("unit-calc-feedback");
-const unitCalcSheetHint = document.getElementById("unit-calc-sheet-hint");
 const btnUnitCalcBack = document.getElementById("unit-calc-back");
 const btnUnitCalcCheck = document.getElementById("unit-calc-check");
 const btnUnitCalcNext = document.getElementById("unit-calc-next");
@@ -130,9 +129,6 @@ function renderUnitCalcTask() {
 
     unitCalcTitle.textContent = `${task.icon || "🧮"} ${task.title}`;
     unitCalcBrief.textContent = task.brief;
-    unitCalcSheetHint.textContent = task.sheetHint
-        ? `Как в таблице: ${task.sheetHint}`
-        : "";
 
     unitCalcGiven.innerHTML = task.given
         .map(
@@ -156,9 +152,10 @@ function renderUnitCalcTask() {
 
     unitCalcFeedback.classList.add("hidden");
     unitCalcFeedback.innerHTML = "";
+    unitCalcFeedback.classList.remove("uc-feedback-ok", "uc-feedback-bad");
     btnUnitCalcCheck.classList.remove("hidden");
     btnUnitCalcNext.classList.add("hidden");
-    btnUnitCalcCheck.disabled = false;
+    syncUnitCalcCheckEnabled();
 
     /* Sync fixed-bar classes only — no scroll (focus on input would fight it) */
     const actionsEl = document.querySelector("#unit-calc-screen .uc-actions");
@@ -170,9 +167,44 @@ function renderUnitCalcTask() {
     firstInput?.focus();
 }
 
+function getUnitCalcAskInputs() {
+    return [...(unitCalcAsk?.querySelectorAll(".uc-input") || [])];
+}
+
+function hasEmptyUnitCalcAnswers() {
+    return getUnitCalcAskInputs().some((input) => !String(input.value || "").trim());
+}
+
+function syncUnitCalcCheckEnabled() {
+    if (!btnUnitCalcCheck || unitCalcChecked) return;
+    btnUnitCalcCheck.disabled = hasEmptyUnitCalcAnswers();
+}
+
+function showUnitCalcEmptyError() {
+    getUnitCalcAskInputs().forEach((input) => {
+        const empty = !String(input.value || "").trim();
+        input.classList.toggle("uc-input-bad", empty);
+        input.classList.remove("uc-input-ok");
+    });
+    unitCalcFeedback.classList.remove("hidden", "uc-feedback-ok");
+    unitCalcFeedback.classList.add("uc-feedback-bad");
+    unitCalcFeedback.innerHTML = `
+        <div class="uc-feedback-title">❌ Введите ответ</div>
+        <p class="uc-hint">Поле ответа пустое — заполните его, затем нажмите «Проверить».</p>
+    `;
+    const firstEmpty = getUnitCalcAskInputs().find((input) => !String(input.value || "").trim());
+    firstEmpty?.focus();
+}
+
 function checkUnitCalcAnswers() {
     const task = unitCalcQueue[unitCalcIndex];
     if (!task || unitCalcChecked) return;
+
+    if (hasEmptyUnitCalcAnswers()) {
+        showUnitCalcEmptyError();
+        syncUnitCalcCheckEnabled();
+        return;
+    }
 
     const results = task.ask.map((a) => {
         const input = unitCalcAsk.querySelector(`[data-ask-key="${a.key}"]`);
@@ -339,6 +371,20 @@ btnUnitCalcBack?.addEventListener("click", () => {
     if (!confirmLeaveUnitCalc()) return;
     closeUnitCalc();
     if (typeof showMainView === "function") showMainView("train");
+});
+
+unitCalcAsk?.addEventListener("input", () => {
+    if (unitCalcChecked) return;
+    getUnitCalcAskInputs().forEach((input) => {
+        if (String(input.value || "").trim()) {
+            input.classList.remove("uc-input-bad");
+        }
+    });
+    if (!hasEmptyUnitCalcAnswers()) {
+        unitCalcFeedback.classList.add("hidden");
+        unitCalcFeedback.classList.remove("uc-feedback-bad");
+    }
+    syncUnitCalcCheckEnabled();
 });
 
 unitCalcAsk?.addEventListener("keydown", (e) => {
