@@ -194,6 +194,13 @@ function showUnitCalcEmptyError() {
     `;
     const firstEmpty = getUnitCalcAskInputs().find((input) => !String(input.value || "").trim());
     firstEmpty?.focus();
+    if (typeof trackMetrikaError === "function") {
+        const task = unitCalcQueue[unitCalcIndex];
+        trackMetrikaError("unit_calc_empty", {
+            message: "empty_answer",
+            task: task?.id || unitCalcIndex || ""
+        });
+    }
 }
 
 function checkUnitCalcAnswers() {

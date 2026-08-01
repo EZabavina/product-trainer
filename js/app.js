@@ -767,6 +767,14 @@ function startFreshQuizFromRoute(route) {
     if (!pool.length) {
         openTopicSetupFromRoute(route);
         alert("В этом формате пока нет вопросов.");
+        if (typeof trackMetrikaError === "function") {
+            trackMetrikaError("quiz_empty", {
+                message: "no_questions_for_format",
+                topic: route.topicName || "",
+                mode: route.mode || "",
+                format: route.format || ""
+            });
+        }
         return;
     }
     launchQuiz({
@@ -901,8 +909,12 @@ function applyTrainRoute(route) {
 }
 
 function applyCurrentRoute({ replace = false } = {}) {
+    const badUrl = getCurrentUrl();
     const route = parseAppRoute(new URL(location.href));
     if (!route) {
+        if (typeof trackMetrikaError === "function") {
+            trackMetrikaError("route_404", { path: badUrl, message: "unknown_route" });
+        }
         history.replaceState({}, "", "/");
         currentAppUrl = "/";
         trackRouteView(currentAppUrl);
@@ -1571,6 +1583,11 @@ function showMainView(view, options = {}) {
             renderStatsView();
         } catch (err) {
             console.error("renderStatsView failed:", err);
+            if (typeof trackMetrikaError === "function") {
+                trackMetrikaError("stats_render", {
+                    message: err && err.message ? err.message : String(err)
+                });
+            }
         }
     } else if (view === "knowledge") {
         knowledgeView.classList.remove("hidden");
@@ -1637,6 +1654,12 @@ function launchPracticeFromIds(questionIds, { label = "Практика", length
     const pool = QUESTIONS.filter((q) => idSet.has(q.id));
     if (!pool.length) {
         alert("Нет вопросов для тренировки по этой выборке.");
+        if (typeof trackMetrikaError === "function") {
+            trackMetrikaError("quiz_empty", {
+                message: "practice_pool_empty",
+                topic: label || ""
+            });
+        }
         return;
     }
     launchQuiz({
@@ -1740,6 +1763,12 @@ function restartQuiz() {
         const pool = getMistakeQuestions(currentMistakeFilter);
         if (pool.length === 0) {
             alert("В банке ошибок больше нет вопросов.");
+            if (typeof trackMetrikaError === "function") {
+                trackMetrikaError("quiz_empty", {
+                    message: "mistakes_bank_empty",
+                    topic: currentMistakeFilter || ""
+                });
+            }
             showMainView("train");
             return;
         }
@@ -1758,6 +1787,13 @@ function restartQuiz() {
     if (currentTopicMode) pool = pool.filter((q) => q.mode === currentTopicMode);
     if (pool.length === 0) {
         alert("В этом формате пока нет вопросов.");
+        if (typeof trackMetrikaError === "function") {
+            trackMetrikaError("quiz_empty", {
+                message: "no_questions_for_format",
+                topic: currentTopic || "",
+                mode: currentTopicMode || ""
+            });
+        }
         return;
     }
     launchQuiz({
@@ -2383,6 +2419,13 @@ function startQuickStart({ fromOnboarding = false } = {}) {
     const pool = QUESTIONS.filter((q) => q.topic === "Метрики" && q.mode === "определение");
     if (!pool.length) {
         alert("Нет вопросов для быстрого старта.");
+        if (typeof trackMetrikaError === "function") {
+            trackMetrikaError("quiz_empty", {
+                message: "quick_start_empty",
+                topic: "Метрики",
+                mode: "определение"
+            });
+        }
         return;
     }
 

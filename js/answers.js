@@ -330,21 +330,41 @@ function sendAnalyticsEvent(event) {
     try {
         const body = JSON.stringify({ source: "product-trainer", event });
         // fetch надёжнее sendBeacon на Vercel (body + JSON)
+        const reportAnalyticsSendFail = (message) => {
+            if (typeof trackMetrikaError === "function") {
+                trackMetrikaError("analytics_send", {
+                    message,
+                    type: event.type || ""
+                });
+            }
+        };
+
+        const tryBeaconFallback = () => {
+            try {
+                if (!navigator.sendBeacon) return false;
+                const blob = new Blob([body], { type: "application/json" });
+                return Boolean(navigator.sendBeacon(EVENTS_API_URL, blob));
+            } catch {
+                return false;
+            }
+        };
+
         fetch(EVENTS_API_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body,
             keepalive: true
-        }).catch(() => {
-            try {
-                if (navigator.sendBeacon) {
-                    const blob = new Blob([body], { type: "application/json" });
-                    navigator.sendBeacon(EVENTS_API_URL, blob);
-                }
-            } catch {
-                /* ignore */
-            }
-        });
+        })
+            .then((res) => {
+                if (res.ok) return;
+                // HTTP-ошибка: пробуем beacon, в Метрику только если и он не помог
+                if (tryBeaconFallback()) return;
+                reportAnalyticsSendFail(`http_${res.status}`);
+            })
+            .catch(() => {
+                if (tryBeaconFallback()) return;
+                reportAnalyticsSendFail(navigator.sendBeacon ? "beacon_failed" : "fetch_failed");
+            });
     } catch {
         /* ignore network errors — локальный лог уже сохранён */
     }

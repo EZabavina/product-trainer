@@ -308,6 +308,12 @@ function showUnitLabEmptyError() {
         fb.textContent = "❌ Введите ответ — поле пустое.";
     }
     input?.focus();
+    if (typeof trackMetrikaError === "function") {
+        trackMetrikaError("unit_lab_empty", {
+            message: "empty_answer",
+            challenge: typeof unitLabIndex === "number" ? unitLabIndex : ""
+        });
+    }
 }
 
 function onUnitLabInputChange(e) {

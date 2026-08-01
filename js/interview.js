@@ -108,6 +108,13 @@ async function startInterview(scenarioId) {
     } catch (err) {
         setInterviewLoading(false);
         interviewStatus.textContent = err.message;
+        if (typeof trackMetrikaError === "function") {
+            trackMetrikaError("interview_api", {
+                phase: "opening",
+                message: err && err.message ? err.message : String(err),
+                scenario: scenarioId || ""
+            });
+        }
     }
 }
 
@@ -133,6 +140,13 @@ async function sendInterviewMessage() {
     } catch (err) {
         setInterviewLoading(false);
         interviewStatus.textContent = err.message;
+        if (typeof trackMetrikaError === "function") {
+            trackMetrikaError("interview_api", {
+                phase: "chat",
+                message: err && err.message ? err.message : String(err),
+                scenario: currentScenario?.id || ""
+            });
+        }
     }
 }
 
@@ -189,6 +203,12 @@ async function endInterview() {
             savedOk = false;
             saveError = String(saveErr && saveErr.message ? saveErr.message : saveErr);
             console.warn("Interview save failed:", saveErr);
+            if (typeof trackMetrikaError === "function") {
+                trackMetrikaError("interview_save", {
+                    message: saveError,
+                    scenario: currentScenario?.id || ""
+                });
+            }
         }
 
         if (interviewDebriefReplayHint) {
@@ -202,6 +222,13 @@ async function endInterview() {
     } catch (err) {
         setInterviewLoading(false);
         interviewStatus.textContent = err.message;
+        if (typeof trackMetrikaError === "function") {
+            trackMetrikaError("interview_api", {
+                phase: "debrief",
+                message: err && err.message ? err.message : String(err),
+                scenario: currentScenario?.id || ""
+            });
+        }
     }
 }
 
