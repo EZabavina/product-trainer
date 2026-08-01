@@ -18,9 +18,19 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "GET") {
+        const webhook = process.env.EVENTS_WEBHOOK_URL || "";
+        let webhookHost = null;
+        try {
+            webhookHost = webhook ? new URL(webhook).hostname : null;
+        } catch {
+            webhookHost = "invalid-url";
+        }
         return res.status(200).json({
             ok: true,
-            hasWebhook: Boolean(process.env.EVENTS_WEBHOOK_URL)
+            hasWebhook: Boolean(webhook),
+            webhookHost,
+            // хвостик URL, чтобы сверить развёртывание без секрета целиком
+            webhookTail: webhook ? webhook.slice(-24) : null
         });
     }
 
@@ -162,8 +172,12 @@ export default async function handler(req, res) {
             questionTextPreview: sanitized.questionText
                 ? String(sanitized.questionText).slice(0, 80)
                 : null,
+            visitorId: sanitized.visitorId,
+            respondentCode: sanitized.respondentCode,
+            cohort: sanitized.cohort,
+            metrikaClientId: sanitized.metrikaClientId,
             upstreamSnippet: upstream.snippet
-                ? String(upstream.snippet).slice(0, 120)
+                ? String(upstream.snippet).slice(0, 240)
                 : null
         });
     } catch (err) {

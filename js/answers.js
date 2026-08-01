@@ -259,8 +259,14 @@ function recordLifecycleEvent(payload) {
 }
 
 function sendAnalyticsEvent(event) {
-    // Подтянуть Metrika clientID, если он появился после создания события
-    if (
+    // Подтянуть identity прямо перед отправкой (на случай гонки с Metrika / storage)
+    if (event && typeof withVisitorContext === "function") {
+        const fresh = withVisitorContext(event);
+        event.visitorId = fresh.visitorId || event.visitorId;
+        event.respondentCode = fresh.respondentCode || event.respondentCode;
+        event.cohort = fresh.cohort || event.cohort;
+        event.metrikaClientId = fresh.metrikaClientId || event.metrikaClientId;
+    } else if (
         event &&
         !event.metrikaClientId &&
         typeof getCachedMetrikaClientId === "function"
