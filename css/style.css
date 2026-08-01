@@ -1535,6 +1535,49 @@ body::before {
     font-weight: 600;
 }
 
+.skills-help {
+    margin: 0;
+}
+
+.skills-help-summary {
+    cursor: pointer;
+    list-style: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    user-select: none;
+}
+
+.skills-help-summary::-webkit-details-marker {
+    display: none;
+}
+
+.skills-help-summary::before {
+    content: "▸";
+    font-size: 0.75rem;
+    line-height: 1;
+    transition: transform 0.15s ease;
+}
+
+.skills-help[open] .skills-help-summary::before {
+    transform: rotate(90deg);
+}
+
+.skills-help-summary:hover {
+    color: var(--text);
+}
+
+.skills-help-body {
+    margin-top: 10px;
+}
+
+.skills-help-body > p {
+    margin: 0 0 8px;
+}
+
 .overall-level {
     display: flex;
     align-items: stretch;

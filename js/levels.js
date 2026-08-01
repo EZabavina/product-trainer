@@ -723,17 +723,41 @@ function renderSkillsLegendHtml() {
     `;
 }
 
+function renderSkillsHelpHtml(introHtml = "") {
+    return `
+        <details class="skills-help">
+            <summary class="skills-help-summary">Как читать таблицу скилов</summary>
+            <div class="skills-help-body">
+                ${introHtml}
+                ${renderSkillsLegendHtml()}
+            </div>
+        </details>
+    `;
+}
+
 function renderGradesSectionHtml() {
     const snapshots = getGradeSnapshots();
     const overall = getOverallProductLevel(snapshots);
     const tested = snapshots.filter((s) => s.bestPercent !== null).length;
+
+    const intro = `
+        <p>
+            Слева — знания по темам, справа — уровни (знать / уметь).
+            В ячейках: <strong>✓ закрыто</strong> / <strong>✗ пробел</strong> —
+            сначала по ответам на вопросы, привязанные к скилу; если ответов ещё нет — по порогу %.
+            Колонка «Лучшая попытка» — верные и ошибки из лучшего квиза темы.
+            Общий уровень показывается после ≥${MIN_TOPICS_FOR_OVERALL_LEVEL} пройденных тем
+            (среднее лучших % по пройденным; непройденные не занижают результат).
+            Из пробелов можно сразу потренировать связанные вопросы.
+        </p>
+    `;
 
     if (tested === 0) {
         return `
             ${renderOverallLevelHtml(overall)}
             <div class="grades-empty">
                 <p>Пройдите квиз по темам — в таблице появятся ✓/✗ по уровням и счётчики лучшей попытки.</p>
-                ${renderSkillsLegendHtml()}
+                ${renderSkillsHelpHtml(intro)}
             </div>
             ${renderSkillMatrixHtml(snapshots)}
         `;
@@ -742,16 +766,7 @@ function renderGradesSectionHtml() {
     return `
         ${renderOverallLevelHtml(overall)}
         <div class="grades-intro">
-            <p>
-                Слева — знания по темам, справа — уровни (знать / уметь).
-                В ячейках: <strong>✓ закрыто</strong> / <strong>✗ пробел</strong> —
-                сначала по ответам на вопросы, привязанные к скилу; если ответов ещё нет — по порогу %.
-                Колонка «Лучшая попытка» — верные и ошибки из лучшего квиза темы.
-                Общий уровень показывается после ≥${MIN_TOPICS_FOR_OVERALL_LEVEL} пройденных тем
-                (среднее лучших % по пройденным; непройденные не занижают результат).
-                Из пробелов можно сразу потренировать связанные вопросы.
-            </p>
-            ${renderSkillsLegendHtml()}
+            ${renderSkillsHelpHtml(intro)}
         </div>
         ${renderSkillMatrixHtml(snapshots)}
     `;
@@ -840,10 +855,30 @@ function buildLearnNextRecommendation({ topic, percent, wrongAnswers = [], quizT
 
     const topicsFromWrongs = [...new Set(wrongAnswers.map((w) => w.topic).filter(Boolean))];
     const cheatTopic = topicName || topicsFromWrongs[0] || null;
-    const bullets =
-        cheatTopic && typeof getCheatSheetBullets === "function"
-            ? getCheatSheetBullets(cheatTopic, 4)
-            : [];
+    const bullets = [];
+    if (typeof getCheatSheetBullets === "function") {
+        const seen = new Set();
+        for (const w of wrongAnswers) {
+            const topic = w.topic || cheatTopic;
+            if (!topic) continue;
+            const batch = getCheatSheetBullets(
+                topic,
+                2,
+                `${w.question || ""} ${w.explanation || ""}`
+            );
+            for (const b of batch) {
+                if (seen.has(b)) continue;
+                seen.add(b);
+                bullets.push(b);
+                if (bullets.length >= 3) break;
+            }
+            if (bullets.length >= 3) break;
+        }
+        if (!bullets.length && cheatTopic) {
+            // Нет текста ошибок — общая шпаргалка темы без query
+            bullets.push(...getCheatSheetBullets(cheatTopic, 3));
+        }
+    }
 
     let lead;
     if (quizType === "mistakes" || quizType === "practice") {

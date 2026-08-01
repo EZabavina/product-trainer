@@ -1899,7 +1899,8 @@ function revealAnswer(selectedIndex, { recordOutcome = true } = {}) {
 
     if (feedbackCheatsheet) {
         if (!isCorrect && typeof formatCheatSheetHtml === "function") {
-            feedbackCheatsheet.innerHTML = formatCheatSheetHtml(q.topic, 4);
+            const cheatQuery = `${q.question || ""} ${q.explanation || ""}`;
+            feedbackCheatsheet.innerHTML = formatCheatSheetHtml(q.topic, 3, cheatQuery);
             feedbackCheatsheet.classList.toggle("hidden", !feedbackCheatsheet.innerHTML.trim());
         } else {
             feedbackCheatsheet.innerHTML = "";
@@ -1951,7 +1952,13 @@ function renderMistakesReview() {
                 .map((s) => s.text)
                 .slice(0, 2);
             const cheat =
-                typeof formatCheatSheetHtml === "function" ? formatCheatSheetHtml(w.topic, 4) : "";
+                typeof formatCheatSheetHtml === "function"
+                    ? formatCheatSheetHtml(
+                          w.topic,
+                          3,
+                          `${w.question || ""} ${w.explanation || ""}`
+                      )
+                    : "";
             return `
         <article class="mistake-item">
             <div class="mistake-header">
