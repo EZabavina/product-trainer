@@ -2226,7 +2226,7 @@ if (btnExportCsv) {
 }
 
 /* ——— Онбординг ——— */
-const ONBOARDING_KEY = "product-trainer-onboarding-v1";
+const ONBOARDING_KEY = "product-trainer-onboarding-v2";
 const onboardingEl = document.getElementById("onboarding");
 const onboardingCard = onboardingEl?.querySelector(".onboarding-card") || null;
 const onboardingBackdrop = document.getElementById("onboarding-backdrop");
@@ -2244,19 +2244,19 @@ const btnHowTo = document.getElementById("btn-how-to");
 
 const ONBOARDING_STEPS = [
     {
-        icon: "🎯",
-        title: "Тренируйся по темам",
-        text: "Выберите тему, формат и длину раунда. Есть квиз, кейсы, лаб, расчёты и симулятор интервью."
+        icon: "📚",
+        title: "База знаний",
+        text: "Это шпаргалки по темам: формулы, определения и подборка материалов. Откройте вкладку «База знаний», чтобы быстро освежить тему перед тренировкой или разобрать ошибку после ответа."
     },
     {
-        icon: "📚",
-        title: "Разбирай ошибки",
-        text: "После ответа смотрите объяснение и базу знаний. Сложные вопросы можно повторить позже."
+        icon: "🎯",
+        title: "Темы и типы тренировок",
+        text: "Сначала выберите тему (Метрики, JTBD, CustDev и др.), затем тип: определения, кейсы, расчёты, лаб или симулятор интервью. Длину раунда можно взять короткой или стандартной."
     },
     {
         icon: "📈",
-        title: "Следи за прогрессом",
-        text: "В статистике — скилы, сложные вопросы и история. Прогресс хранится в этом браузере."
+        title: "Что в статистике",
+        text: "Уровень и таблица скилов, сложные вопросы, прогресс по темам и история раундов. Всё хранится в этом браузере — можно вернуться и продолжить с того же места."
     }
 ];
 
