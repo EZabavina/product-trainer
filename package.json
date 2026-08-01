@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "node scripts/dev-server.mjs",
     "build": "node scripts/build.mjs && node scripts/build-interview.mjs && node scripts/build-question-skills.mjs && node scripts/build-unit-calc.mjs",
-    "vercel-build": "node scripts/vercel-build.mjs"
+    "vercel-build": "node scripts/vercel-build.mjs",
+    "test:visitor": "node scripts/verify-visitor-identity.mjs"
   }
 }

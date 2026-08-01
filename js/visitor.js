@@ -6,17 +6,23 @@
  * - cohort: из ?cohort= (группа теста)
  * - metrikaClientId: clientID Яндекс.Метрики (getClientID / cookie _ym_uid)
  *
- * Примеры ссылок:
+ * uid/cohort хранятся в localStorage + cookie (~180 дней, sliding при активности).
+ * Заход без ?uid= НЕ сбрасывает код. Сброс: ?uid= / ?respondent= (пусто|clear).
+ * Пустой ?code= не сбрасывает. Смена uid без ?cohort= сбрасывает чужой cohort.
+ *
+ * Примеры:
  *   https://app.example/?uid=anna
  *   https://app.example/?uid=anna&cohort=pm-july
- *
- * Загрузка без uid/cohort сбрасывает прошлый respondent/cohort
- * (чтобы на общем браузере не наследовать чужой код). visitorId не трогаем.
  */
 const VISITOR_ID_KEY = "product-trainer-visitor-id";
 const RESPONDENT_CODE_KEY = "product-trainer-respondent-code";
 const COHORT_KEY = "product-trainer-cohort";
 const METRIKA_CLIENT_ID_KEY = "product-trainer-metrika-client-id";
+const RESPONDENT_COOKIE = "pt_uid";
+const COHORT_COOKIE = "pt_cohort";
+const IDENTITY_TOUCHED_KEY = "product-trainer-identity-touched";
+/** ~6 месяцев; продлевается при активности */
+const IDENTITY_COOKIE_MAX_AGE_SEC = 60 * 60 * 24 * 180;
 
 let metrikaClientIdMemory = null;
 let metrikaClientIdPollStarted = false;
@@ -43,12 +49,48 @@ function sanitizeIdentityToken(value, maxLen = 64) {
     return cleaned;
 }
 
+function isClearIdentityToken(value) {
+    const v = String(value || "")
+        .trim()
+        .toLowerCase();
+    return v === "" || v === "clear" || v === "reset" || v === "-";
+}
+
+function readCookie(name) {
+    try {
+        const match = document.cookie.match(
+            new RegExp(`(?:^|;\\s*)${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}=([^;]*)`)
+        );
+        if (!match || match[1] == null) return "";
+        return decodeURIComponent(match[1]);
+    } catch {
+        return "";
+    }
+}
+
+function writeCookie(name, value, maxAgeSec = IDENTITY_COOKIE_MAX_AGE_SEC) {
+    try {
+        const secure = typeof location !== "undefined" && location.protocol === "https:" ? "; Secure" : "";
+        document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAgeSec}; SameSite=Lax${secure}`;
+    } catch {
+        /* ignore */
+    }
+}
+
+function clearCookie(name) {
+    try {
+        const secure = typeof location !== "undefined" && location.protocol === "https:" ? "; Secure" : "";
+        document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax${secure}`;
+    } catch {
+        /* ignore */
+    }
+}
+
 function getOrCreateVisitorId() {
     try {
         const raw = localStorage.getItem(VISITOR_ID_KEY) || "";
         let id = sanitizeIdentityToken(raw, 80);
         if (id && id.length >= 8) {
-            // Перезаписать, если в storage лежал «грязный» id
             if (id !== raw) localStorage.setItem(VISITOR_ID_KEY, id);
             return id;
         }
@@ -62,18 +104,57 @@ function getOrCreateVisitorId() {
 
 function getStoredRespondentCode() {
     try {
-        return sanitizeIdentityToken(localStorage.getItem(RESPONDENT_CODE_KEY) || "");
+        const fromLs = sanitizeIdentityToken(localStorage.getItem(RESPONDENT_CODE_KEY) || "");
+        if (fromLs) {
+            touchIdentityPersistence(fromLs, getStoredCohortRaw());
+            return fromLs;
+        }
     } catch {
-        return "";
+        /* ignore */
     }
+    const fromCookie = sanitizeIdentityToken(readCookie(RESPONDENT_COOKIE));
+    if (fromCookie) {
+        try {
+            localStorage.setItem(RESPONDENT_CODE_KEY, fromCookie);
+        } catch {
+            /* ignore */
+        }
+        const cohort = getStoredCohortRaw();
+        touchIdentityPersistence(fromCookie, cohort);
+        return fromCookie;
+    }
+    return "";
+}
+
+/** Читает cohort без продления TTL (чтобы не зациклить touch). */
+function getStoredCohortRaw() {
+    try {
+        const fromLs = sanitizeIdentityToken(localStorage.getItem(COHORT_KEY) || "", 40);
+        if (fromLs) return fromLs;
+    } catch {
+        /* ignore */
+    }
+    return sanitizeIdentityToken(readCookie(COHORT_COOKIE), 40);
 }
 
 function getStoredCohort() {
-    try {
-        return sanitizeIdentityToken(localStorage.getItem(COHORT_KEY) || "", 40);
-    } catch {
-        return "";
+    const cohort = getStoredCohortRaw();
+    if (cohort) {
+        try {
+            localStorage.setItem(COHORT_KEY, cohort);
+        } catch {
+            /* ignore */
+        }
+        const uid = (() => {
+            try {
+                return sanitizeIdentityToken(localStorage.getItem(RESPONDENT_CODE_KEY) || "");
+            } catch {
+                return sanitizeIdentityToken(readCookie(RESPONDENT_COOKIE));
+            }
+        })();
+        touchIdentityPersistence(uid, cohort);
     }
+    return cohort;
 }
 
 function setStoredRespondentCode(code) {
@@ -84,6 +165,8 @@ function setStoredRespondentCode(code) {
     } catch {
         /* ignore */
     }
+    writeCookie(RESPONDENT_COOKIE, clean);
+    touchIdentityPersistence(clean, getStoredCohortRaw());
 }
 
 function setStoredCohort(cohort) {
@@ -91,6 +174,29 @@ function setStoredCohort(cohort) {
     if (!clean) return;
     try {
         localStorage.setItem(COHORT_KEY, clean);
+    } catch {
+        /* ignore */
+    }
+    writeCookie(COHORT_COOKIE, clean);
+    touchIdentityPersistence(getStoredRespondentCodeNoTouch(), clean);
+}
+
+function getStoredRespondentCodeNoTouch() {
+    try {
+        const fromLs = sanitizeIdentityToken(localStorage.getItem(RESPONDENT_CODE_KEY) || "");
+        if (fromLs) return fromLs;
+    } catch {
+        /* ignore */
+    }
+    return sanitizeIdentityToken(readCookie(RESPONDENT_COOKIE));
+}
+
+/** Продлевает cookie на 180 дней с последней активности. */
+function touchIdentityPersistence(uid, cohort) {
+    if (uid) writeCookie(RESPONDENT_COOKIE, uid);
+    if (cohort) writeCookie(COHORT_COOKIE, cohort);
+    try {
+        localStorage.setItem(IDENTITY_TOUCHED_KEY, String(Date.now()));
     } catch {
         /* ignore */
     }
@@ -102,6 +208,7 @@ function clearStoredRespondentCode() {
     } catch {
         /* ignore */
     }
+    clearCookie(RESPONDENT_COOKIE);
 }
 
 function clearStoredCohort() {
@@ -110,13 +217,13 @@ function clearStoredCohort() {
     } catch {
         /* ignore */
     }
+    clearCookie(COHORT_COOKIE);
 }
 
 /**
- * Считать uid/cohort из URL.
- * По умолчанию один раз за загрузку: без параметров — сброс прошлых кодов.
- * @param {string} [href]
- * @param {{ force?: boolean }} [options] force — применить снова (тесты / редкие кейсы)
+ * Считать uid/cohort из URL (один раз за загрузку).
+ * Без параметра — оставляем сохранённый код (TTL продлевается при чтении).
+ * Сброс только через ?uid= / ?respondent= (пусто|clear), не через пустой ?code=
  */
 function captureRespondentFromUrl(href = location.href, options = {}) {
     const force = Boolean(options && options.force);
@@ -130,42 +237,71 @@ function captureRespondentFromUrl(href = location.href, options = {}) {
 
     try {
         const url = new URL(href, location.origin);
-        const hasUidParam =
-            url.searchParams.has("uid") ||
-            url.searchParams.has("respondent") ||
-            url.searchParams.has("code");
-        const hasCohortParam = url.searchParams.has("cohort");
+        const prevUid = getStoredRespondentCodeNoTouch();
 
-        const uidRaw =
-            url.searchParams.get("uid") ||
-            url.searchParams.get("respondent") ||
-            url.searchParams.get("code");
-        const cohortRaw = url.searchParams.get("cohort");
-
-        if (hasUidParam) {
-            const clean = sanitizeIdentityToken(uidRaw);
-            if (clean) setStoredRespondentCode(clean);
-            else clearStoredRespondentCode();
-        } else {
-            clearStoredRespondentCode();
+        // uid / respondent — основные персональные ссылки (пустой = сброс)
+        if (url.searchParams.has("uid")) {
+            const raw = url.searchParams.get("uid");
+            if (isClearIdentityToken(raw)) {
+                clearStoredRespondentCode();
+                clearStoredCohort();
+            } else {
+                const next = sanitizeIdentityToken(raw);
+                if (prevUid && next && prevUid !== next && !url.searchParams.has("cohort")) {
+                    // Новый человек по ссылке без cohort — не наследуем чужую группу
+                    clearStoredCohort();
+                }
+                setStoredRespondentCode(raw);
+            }
+        } else if (url.searchParams.has("respondent")) {
+            const raw = url.searchParams.get("respondent");
+            if (isClearIdentityToken(raw)) {
+                clearStoredRespondentCode();
+                clearStoredCohort();
+            } else {
+                const next = sanitizeIdentityToken(raw);
+                if (prevUid && next && prevUid !== next && !url.searchParams.has("cohort")) {
+                    clearStoredCohort();
+                }
+                setStoredRespondentCode(raw);
+            }
+        } else if (url.searchParams.has("code")) {
+            // ?code= — только установка; пустой code= не сбрасывает
+            const raw = url.searchParams.get("code");
+            const token = String(raw || "")
+                .trim()
+                .toLowerCase();
+            if (token === "clear" || token === "reset" || token === "-") {
+                clearStoredRespondentCode();
+                clearStoredCohort();
+            } else if (raw && !isClearIdentityToken(raw)) {
+                const next = sanitizeIdentityToken(raw);
+                if (prevUid && next && prevUid !== next && !url.searchParams.has("cohort")) {
+                    clearStoredCohort();
+                }
+                setStoredRespondentCode(raw);
+            }
         }
 
-        if (hasCohortParam) {
-            const clean = sanitizeIdentityToken(cohortRaw, 40);
-            if (clean) setStoredCohort(clean);
-            else clearStoredCohort();
-        } else {
-            clearStoredCohort();
+        if (url.searchParams.has("cohort")) {
+            const raw = url.searchParams.get("cohort");
+            if (isClearIdentityToken(raw)) clearStoredCohort();
+            else setStoredCohort(raw);
         }
+
+        // Продлить TTL при любом заходе, если код уже есть
+        const uid = getStoredRespondentCodeNoTouch();
+        const cohort = getStoredCohortRaw();
+        if (uid || cohort) touchIdentityPersistence(uid, cohort);
 
         return {
-            respondentCode: getStoredRespondentCode(),
-            cohort: getStoredCohort()
+            respondentCode: getStoredRespondentCodeNoTouch(),
+            cohort: getStoredCohortRaw()
         };
     } catch {
         return {
-            respondentCode: getStoredRespondentCode(),
-            cohort: getStoredCohort()
+            respondentCode: getStoredRespondentCodeNoTouch(),
+            cohort: getStoredCohortRaw()
         };
     }
 }
