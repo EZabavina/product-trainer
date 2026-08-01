@@ -44,6 +44,11 @@ function trimEventText(value, maxLen) {
     return trimmed.length > maxLen ? `${trimmed.slice(0, maxLen - 1)}…` : trimmed;
 }
 
+/** Для ответа в Sheets всегда строка (не null) — иначе GAS пишет пусто. */
+function requiredEventText(value, maxLen) {
+    return trimEventText(value, maxLen) || "";
+}
+
 /**
  * Тексты вопроса и ответов для экспорта / старых событий без questionText.
  */
@@ -100,17 +105,19 @@ function lookupAnswerEventLabels(event) {
 function resolveAnswerEventLabels(event) {
     const fromLookup = lookupAnswerEventLabels(event);
     return {
-        questionText: event.questionText || fromLookup.questionText,
-        selectedText: event.selectedText || fromLookup.selectedText,
-        correctText: event.correctText || fromLookup.correctText
+        questionText: (event && event.questionText) || fromLookup.questionText || "",
+        selectedText: (event && event.selectedText) || fromLookup.selectedText || "",
+        correctText: (event && event.correctText) || fromLookup.correctText || ""
     };
 }
 
 /**
  * Записать исход одного ответа.
+ * Всегда кладёт тексты вопроса / выбранного / верного ответа.
  * @returns {object} event
  */
 function recordAnswerOutcome(payload) {
+    const labels = resolveAnswerEventLabels(payload || {});
     const event = {
         id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         type: "answer",
@@ -118,15 +125,19 @@ function recordAnswerOutcome(payload) {
         correct: Boolean(payload.correct),
         selectedIndex:
             typeof payload.selectedIndex === "number" ? payload.selectedIndex : null,
-        questionText: trimEventText(payload.questionText, 500),
-        selectedText: trimEventText(payload.selectedText, 300),
-        correctText: trimEventText(payload.correctText, 300),
+        questionText: requiredEventText(labels.questionText, 500),
+        selectedText: requiredEventText(labels.selectedText, 300),
+        correctText: requiredEventText(labels.correctText, 300),
         topic: payload.topic || null,
         mode: payload.mode || null,
         quizType: payload.quizType || "topic",
         sessionId: payload.sessionId || null,
         date: new Date().toISOString()
     };
+
+    if (!event.questionText || !event.correctText) {
+        console.warn("[answers] missing texts for questionId", event.questionId, event);
+    }
 
     const data = loadAnswerLog();
     data.events.push(event);

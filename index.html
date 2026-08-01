@@ -57,7 +57,12 @@
             <div id="train-view">
                 <div class="overview-strip" id="overview-strip"></div>
                 <div id="mistakes-banner" class="mistakes-banner hidden"></div>
-                <h2 class="section-title">Выберите тему</h2>
+                <div class="train-start-row">
+                    <h2 class="section-title">Выберите тему</h2>
+                    <button type="button" class="btn btn-secondary train-quick-start" id="btn-quick-start">
+                        ⚡ Быстрый старт
+                    </button>
+                </div>
                 <div class="topics-grid" id="topics-grid"></div>
             </div>
 
@@ -92,6 +97,28 @@
                 </div>
             </div>
 
+            <!-- Онбординг -->
+            <div id="onboarding" class="mode-picker hidden" role="dialog" aria-modal="true" aria-labelledby="onboarding-title" aria-describedby="onboarding-text">
+                <div class="mode-picker-backdrop" id="onboarding-backdrop"></div>
+                <div class="mode-picker-card onboarding-card" tabindex="-1">
+                    <button type="button" class="mode-picker-close" id="onboarding-close" aria-label="Закрыть">×</button>
+                    <div class="mode-picker-scroll onboarding-scroll">
+                        <p class="onboarding-step-label" id="onboarding-step-label"></p>
+                        <div class="onboarding-icon" id="onboarding-icon" aria-hidden="true"></div>
+                        <h2 class="onboarding-title" id="onboarding-title"></h2>
+                        <p class="onboarding-text" id="onboarding-text"></p>
+                        <div class="onboarding-dots" id="onboarding-dots" aria-hidden="true"></div>
+                    </div>
+                    <div class="mode-picker-footer onboarding-footer">
+                        <button type="button" class="btn-text" id="onboarding-skip">Пропустить</button>
+                        <div class="onboarding-footer-actions">
+                            <button type="button" class="btn btn-secondary hidden" id="onboarding-back">Назад</button>
+                            <button type="button" class="btn btn-primary" id="onboarding-next">Далее</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- База знаний -->
             <div id="knowledge-view" class="hidden">
                 <p class="knowledge-intro">Шпаргалки и материалы по темам. Уровни Middle/Senior — в «Статистика → Таблица скилов».</p>
@@ -101,6 +128,9 @@
 
             <!-- Статистика -->
             <div id="stats-view" class="hidden">
+                <div class="stats-toolbar">
+                    <button type="button" class="btn-text" id="btn-how-to">Как пользоваться</button>
+                </div>
                 <div class="stats-hero" id="stats-hero"></div>
 
                 <section class="stats-section">

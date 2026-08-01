@@ -179,8 +179,10 @@ async function endInterview() {
                 });
             }
             if (typeof recordSession === "function") {
-                recordSession("CustDev", 0, userTurns, null, {
-                    quizType: "interview"
+                // Симулятор без % — не портит средний результат в статистике
+                recordSession("CustDev", userTurns, null, null, {
+                    quizType: "interview",
+                    percent: null
                 });
             }
         } catch (saveErr) {

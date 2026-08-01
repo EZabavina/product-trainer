@@ -6,6 +6,8 @@
  * превращает POST в GET и doPost не выполняется. Поэтому редиректы
  * следуем вручную, сохраняя POST + text/plain.
  */
+import { enrichAnswerTexts } from "./enrich-answer-texts.js";
+
 export default async function handler(req, res) {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -34,6 +36,12 @@ export default async function handler(req, res) {
             } catch {
                 body = {};
             }
+        } else if (Buffer.isBuffer(body)) {
+            try {
+                body = JSON.parse(body.toString("utf8") || "{}");
+            } catch {
+                body = {};
+            }
         }
         body = body || {};
 
@@ -54,31 +62,34 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: "unsupported event.type" });
         }
 
-        const sanitized = {
+        const textOrNull = (value, max) => {
+            if (value == null) return null;
+            const s = String(value).trim();
+            if (!s) return null;
+            return s.slice(0, max);
+        };
+
+        let sanitized = {
             type: event.type,
             questionId: event.questionId ?? null,
             correct: event.type === "answer" ? Boolean(event.correct) : undefined,
             selectedIndex: event.selectedIndex ?? null,
-            questionText:
-                typeof event.questionText === "string" ? event.questionText.slice(0, 500) : null,
-            selectedText:
-                typeof event.selectedText === "string" ? event.selectedText.slice(0, 300) : null,
-            correctText:
-                typeof event.correctText === "string" ? event.correctText.slice(0, 300) : null,
-            topic: typeof event.topic === "string" ? event.topic.slice(0, 80) : null,
-            mode: typeof event.mode === "string" ? event.mode.slice(0, 40) : null,
-            quizType: typeof event.quizType === "string" ? event.quizType.slice(0, 40) : null,
-            sessionId: typeof event.sessionId === "string" ? event.sessionId.slice(0, 64) : null,
-            sessionLength:
-                typeof event.sessionLength === "string" ? event.sessionLength.slice(0, 40) : null,
+            questionText: textOrNull(event.questionText, 500),
+            selectedText: textOrNull(event.selectedText, 300),
+            correctText: textOrNull(event.correctText, 300),
+            topic: textOrNull(event.topic, 80),
+            mode: textOrNull(event.mode, 40),
+            quizType: textOrNull(event.quizType, 40),
+            sessionId: textOrNull(event.sessionId, 64),
+            sessionLength: textOrNull(event.sessionLength, 40),
             score: typeof event.score === "number" ? event.score : null,
             total: typeof event.total === "number" ? event.total : null,
             percent: typeof event.percent === "number" ? event.percent : null,
-            route: typeof event.route === "string" ? event.route.slice(0, 120) : null,
-            formatSlug: typeof event.formatSlug === "string" ? event.formatSlug.slice(0, 40) : null,
-            topicSlug: typeof event.topicSlug === "string" ? event.topicSlug.slice(0, 40) : null,
+            route: textOrNull(event.route, 120),
+            formatSlug: textOrNull(event.formatSlug, 40),
+            topicSlug: textOrNull(event.topicSlug, 40),
             questionIndex: typeof event.questionIndex === "number" ? event.questionIndex : null,
-            exitReason: typeof event.exitReason === "string" ? event.exitReason.slice(0, 40) : null,
+            exitReason: textOrNull(event.exitReason, 40),
             plannedQuestions:
                 typeof event.plannedQuestions === "number" ? event.plannedQuestions : null,
             answeredCount: typeof event.answeredCount === "number" ? event.answeredCount : null,
@@ -86,9 +97,29 @@ export default async function handler(req, res) {
             receivedAt: new Date().toISOString()
         };
 
+        // Страховка: восстановить тексты из банка вопросов, если клиент их не прислал
+        sanitized = enrichAnswerTexts(sanitized);
+
+        if (
+            sanitized.type === "answer" &&
+            (!sanitized.questionText || !sanitized.correctText)
+        ) {
+            console.warn("[events] answer still missing texts", {
+                questionId: sanitized.questionId,
+                hasQuestion: Boolean(sanitized.questionText),
+                hasSelected: Boolean(sanitized.selectedText),
+                hasCorrect: Boolean(sanitized.correctText)
+            });
+        }
+
         const webhook = process.env.EVENTS_WEBHOOK_URL;
         if (!webhook) {
-            console.log("[events]", sanitized.type, sanitized.questionId ?? sanitized.topic);
+            console.log(
+                "[events]",
+                sanitized.type,
+                sanitized.questionId ?? sanitized.topic,
+                sanitized.questionText ? `q:"${sanitized.questionText.slice(0, 40)}…"` : "q:(empty)"
+            );
             return res.status(202).json({ ok: true, forwarded: false, hasWebhook: false });
         }
 
@@ -110,7 +141,11 @@ export default async function handler(req, res) {
             ok: true,
             forwarded: true,
             hasWebhook: true,
-            upstreamStatus: upstream.status
+            upstreamStatus: upstream.status,
+            // для отладки в Network: тексты реально ушли
+            hasQuestionText: Boolean(sanitized.questionText),
+            hasSelectedText: Boolean(sanitized.selectedText),
+            hasCorrectText: Boolean(sanitized.correctText)
         });
     } catch (err) {
         console.error("Events API error:", err);

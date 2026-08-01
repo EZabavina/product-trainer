@@ -359,17 +359,20 @@ function getTopicBestAnswerStats(topicName) {
 }
 
 /**
- * Общий уровень: средний лучший % по ВСЕМ темам (непройденные = 0%).
- * Так неполный профиль не завышает грейд.
+ * Общий уровень: средний лучший % только по пройденным темам.
+ * Грейд в заголовке — только при достаточном покрытии (иначе легко переоценить).
  */
+const MIN_TOPICS_FOR_OVERALL_LEVEL = 3;
+
 function getOverallProductLevel(snapshots) {
     const list = snapshots || getGradeSnapshots();
-    const totalTopics = list.length || 1;
     const tested = list.filter((s) => s.bestPercent !== null);
+    const minForLevel = Math.min(MIN_TOPICS_FOR_OVERALL_LEVEL, list.length || MIN_TOPICS_FOR_OVERALL_LEVEL);
 
-    const avgPercent = Math.round(
-        list.reduce((sum, s) => sum + (s.bestPercent ?? 0), 0) / totalTopics
-    );
+    const avgPercent =
+        tested.length > 0
+            ? Math.round(tested.reduce((sum, s) => sum + s.bestPercent, 0) / tested.length)
+            : null;
 
     let correct = 0;
     let wrong = 0;
@@ -379,12 +382,16 @@ function getOverallProductLevel(snapshots) {
     });
 
     const complete = tested.length === list.length && list.length > 0;
-    const level = tested.length === 0 ? null : getLevelByPercent(avgPercent);
+    const enoughCoverage = tested.length >= minForLevel;
+    const level =
+        avgPercent === null || !enoughCoverage ? null : getLevelByPercent(avgPercent);
 
     return {
         tested: tested.length,
         totalTopics: list.length,
-        avgPercent: tested.length === 0 ? null : avgPercent,
+        minForLevel,
+        enoughCoverage,
+        avgPercent,
         level,
         levelLabel: level ? overallLevelLabel(level) : null,
         correct,
@@ -632,7 +639,7 @@ function renderSkillMatrixHtml(snapshots) {
 }
 
 function renderOverallLevelHtml(overall) {
-    if (!overall.level) {
+    if (!overall.tested) {
         return `
             <div class="overall-level overall-level-empty">
                 <p>Пройдите квиз хотя бы по одной теме — появится ориентир уровня и таблица скилов.</p>
@@ -640,9 +647,39 @@ function renderOverallLevelHtml(overall) {
         `;
     }
 
+    const statsBlock = `
+            <div class="overall-level-stats">
+                <div class="overall-stat">
+                    <span class="overall-stat-value overall-stat-ok">✓ ${overall.correct}</span>
+                    <span class="overall-stat-label">верных (лучшие)</span>
+                </div>
+                <div class="overall-stat">
+                    <span class="overall-stat-value overall-stat-bad">✗ ${overall.wrong}</span>
+                    <span class="overall-stat-label">ошибок (лучшие)</span>
+                </div>
+            </div>`;
+
+    if (!overall.enoughCoverage || !overall.level) {
+        const left = Math.max(0, overall.minForLevel - overall.tested);
+        return `
+            <div class="overall-level overall-level-partial">
+                <div class="overall-level-main">
+                    <p class="overall-level-kicker">Пока рано для общего уровня</p>
+                    <h3 class="overall-level-title">Пройдено ${overall.tested}/${overall.totalTopics} тем</h3>
+                    <p class="overall-level-meta">
+                        Средний по пройденным ${overall.avgPercent}% ·
+                        уровень появится после ещё ${left} ${left === 1 ? "темы" : "тем"}
+                        (нужно ≥${overall.minForLevel}).
+                    </p>
+                </div>
+                ${statsBlock}
+            </div>
+        `;
+    }
+
     const status = overall.complete
         ? "профиль полный · все темы учтены"
-        : `неполный профиль · непройденные темы считаются как 0%`;
+        : `неполный профиль · среднее только по пройденным`;
 
     return `
         <div class="overall-level" style="--level-color: ${overall.level.color}">
@@ -654,16 +691,7 @@ function renderOverallLevelHtml(overall) {
                     · ${escapeHtml(status)}
                 </p>
             </div>
-            <div class="overall-level-stats">
-                <div class="overall-stat">
-                    <span class="overall-stat-value overall-stat-ok">✓ ${overall.correct}</span>
-                    <span class="overall-stat-label">верных (лучшие)</span>
-                </div>
-                <div class="overall-stat">
-                    <span class="overall-stat-value overall-stat-bad">✗ ${overall.wrong}</span>
-                    <span class="overall-stat-label">ошибок (лучшие)</span>
-                </div>
-            </div>
+            ${statsBlock}
         </div>
     `;
 }
@@ -719,7 +747,8 @@ function renderGradesSectionHtml() {
                 В ячейках: <strong>✓ закрыто</strong> / <strong>✗ пробел</strong> —
                 сначала по ответам на вопросы, привязанные к скилу; если ответов ещё нет — по порогу %.
                 Колонка «Лучшая попытка» — верные и ошибки из лучшего квиза темы.
-                Общий уровень = среднее лучших % по <strong>всем</strong> темам (непройденные = 0%).
+                Общий уровень показывается после ≥${MIN_TOPICS_FOR_OVERALL_LEVEL} пройденных тем
+                (среднее лучших % по пройденным; непройденные не занижают результат).
                 Из пробелов можно сразу потренировать связанные вопросы.
             </p>
             ${renderSkillsLegendHtml()}

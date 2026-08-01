@@ -495,8 +495,13 @@ function canLeaveCurrentFlow(exitReason = "leave_confirm") {
 }
 
 function navigateToUrl(nextUrl, { replace = false, exitReason = "nav_click" } = {}) {
-    if (nextUrl === currentAppUrl) return;
+    if (nextUrl === currentAppUrl && !isOnboardingOpen()) return;
     if (!canLeaveCurrentFlow(exitReason)) return;
+
+    if (isOnboardingOpen()) {
+        // Уход по навигации не помечает онбординг done — только Skip / CTA / крестик
+        closeOnboarding({ markDone: false, reason: "nav", track: true });
+    }
 
     if (replace) history.replaceState({}, "", nextUrl);
     else history.pushState({}, "", nextUrl);
@@ -641,7 +646,7 @@ function renderOverviewStrip() {
             <div class="stat-pill-label">Всего</div>
         </div>
         <div class="stat-pill">
-            <div class="stat-pill-value">${o.total > 0 ? o.avgPercent + "%" : "—"}</div>
+            <div class="stat-pill-value">${o.avgPercent !== null ? o.avgPercent + "%" : "—"}</div>
             <div class="stat-pill-label">Средний %</div>
         </div>
         <div class="stat-pill">
@@ -661,7 +666,9 @@ function renderTopics() {
             const countText = getTopicCountText(topic.name);
             const miniStat =
                 topic.count > 0
-                    ? `Ср. ${topic.avg}% · ${topic.count} раз`
+                    ? topic.avg !== null
+                        ? `Ср. ${topic.avg}% · ${topic.count} раз`
+                        : `${topic.count} раз`
                     : "Ещё не проходили";
             const miniClass = topic.count > 0 ? "topic-mini-stat" : "topic-mini-stat empty";
 
@@ -1254,7 +1261,7 @@ function renderStatsView() {
             <div class="stat-pill-label">Средний % сегодня</div>
         </div>
         <div class="stat-pill">
-            <div class="stat-pill-value">${o.bestPercent > 0 ? o.bestPercent + "%" : "—"}</div>
+            <div class="stat-pill-value">${o.bestPercent !== null ? o.bestPercent + "%" : "—"}</div>
             <div class="stat-pill-label">Лучший результат</div>
         </div>
         <div class="stat-pill">
@@ -1293,7 +1300,12 @@ function renderStatsView() {
     activityChart.innerHTML = activity
         .map((d) => {
             const h = Math.max((d.count / maxCount) * 100, d.count > 0 ? 8 : 2);
-            const tip = d.count > 0 ? `${d.count} раз · ср. ${d.avg}%` : "Нет данных";
+            const tip =
+                d.count > 0
+                    ? d.avg !== null
+                        ? `${d.count} раз · ср. ${d.avg}%`
+                        : `${d.count} раз`
+                    : "Нет данных";
             return `
             <div class="activity-bar-wrap">
                 <div class="activity-bar" style="height: ${h}%" data-tip="${escapeHtml(tip)}"></div>
@@ -1359,16 +1371,30 @@ function renderStatsView() {
         `;
     } else {
         sessionsList.innerHTML = recent
-            .map(
-                (s) => `
+            .map((s) => {
+                const isInterview = s.quizType === "interview";
+                const hasPercent = typeof sessionHasPercentScore === "function"
+                    ? sessionHasPercentScore(s)
+                    : typeof s.percent === "number";
+                const scoreLabel = isInterview
+                    ? `${s.score ?? 0} репл.`
+                    : `${s.score ?? 0}/${s.total ?? 0}`;
+                const percentLabel = hasPercent
+                    ? `${s.percent}%`
+                    : isInterview
+                      ? "разбор"
+                      : "—";
+                const percentClass = hasPercent ? scoreClass(s.percent) : "mid";
+
+                return `
             <div class="session-row">
                 <span class="session-time">${escapeHtml(formatDate(s.date))} ${escapeHtml(formatTime(s.date))}</span>
                 <span class="session-topic">${escapeHtml(getSessionTopicLabel(s))}</span>
-                <span>${s.score}/${s.total}</span>
-                <span class="session-score ${scoreClass(s.percent)}">${s.percent}%</span>
+                <span>${escapeHtml(scoreLabel)}</span>
+                <span class="session-score ${percentClass}">${escapeHtml(percentLabel)}</span>
             </div>
-        `
-            )
+        `;
+            })
             .join("");
     }
 }
@@ -1504,6 +1530,9 @@ function setNavVisible(visible) {
 }
 
 function showMainView(view, options = {}) {
+    if (isOnboardingOpen()) {
+        closeOnboarding({ markDone: false, reason: "nav", track: true });
+    }
     closeQuizSetup();
     if (typeof closeInterview === "function") closeInterview();
     if (typeof closeUnitCalc === "function") closeUnitCalc();
@@ -2178,10 +2207,243 @@ if (btnExportCsv) {
     });
 }
 
+/* ——— Онбординг ——— */
+const ONBOARDING_KEY = "product-trainer-onboarding-v1";
+const onboardingEl = document.getElementById("onboarding");
+const onboardingCard = onboardingEl?.querySelector(".onboarding-card") || null;
+const onboardingBackdrop = document.getElementById("onboarding-backdrop");
+const onboardingClose = document.getElementById("onboarding-close");
+const onboardingStepLabel = document.getElementById("onboarding-step-label");
+const onboardingIcon = document.getElementById("onboarding-icon");
+const onboardingTitle = document.getElementById("onboarding-title");
+const onboardingText = document.getElementById("onboarding-text");
+const onboardingDots = document.getElementById("onboarding-dots");
+const onboardingSkip = document.getElementById("onboarding-skip");
+const onboardingBack = document.getElementById("onboarding-back");
+const onboardingNext = document.getElementById("onboarding-next");
+const btnQuickStart = document.getElementById("btn-quick-start");
+const btnHowTo = document.getElementById("btn-how-to");
+
+const ONBOARDING_STEPS = [
+    {
+        icon: "🎯",
+        title: "Тренируйся по темам",
+        text: "Выберите тему, формат и длину раунда. Есть квиз, кейсы, лаб, расчёты и симулятор интервью."
+    },
+    {
+        icon: "📚",
+        title: "Разбирай ошибки",
+        text: "После ответа смотрите объяснение и базу знаний. Сложные вопросы можно повторить позже."
+    },
+    {
+        icon: "📈",
+        title: "Следи за прогрессом",
+        text: "В статистике — скилы, сложные вопросы и история. Прогресс хранится в этом браузере."
+    }
+];
+
+let onboardingStep = 0;
+let onboardingPrevFocus = null;
+
+function isOnboardingDone() {
+    try {
+        return localStorage.getItem(ONBOARDING_KEY) === "done";
+    } catch {
+        return false;
+    }
+}
+
+function markOnboardingDone() {
+    try {
+        localStorage.setItem(ONBOARDING_KEY, "done");
+    } catch {
+        /* ignore */
+    }
+}
+
+function isOnboardingOpen() {
+    return onboardingEl && !onboardingEl.classList.contains("hidden");
+}
+
+function restoreOnboardingFocus() {
+    const prev = onboardingPrevFocus;
+    onboardingPrevFocus = null;
+    if (prev && typeof prev.focus === "function" && document.contains(prev)) {
+        try {
+            prev.focus({ preventScroll: true });
+        } catch {
+            prev.focus();
+        }
+    }
+}
+
+function renderOnboardingStep() {
+    const step = ONBOARDING_STEPS[onboardingStep];
+    if (!step) return;
+
+    const total = ONBOARDING_STEPS.length;
+    const isLast = onboardingStep === total - 1;
+
+    if (onboardingStepLabel) {
+        onboardingStepLabel.textContent = `Шаг ${onboardingStep + 1} из ${total}`;
+    }
+    if (onboardingIcon) onboardingIcon.textContent = step.icon;
+    if (onboardingTitle) onboardingTitle.textContent = step.title;
+    if (onboardingText) onboardingText.textContent = step.text;
+
+    if (onboardingDots) {
+        onboardingDots.innerHTML = ONBOARDING_STEPS.map(
+            (_, i) =>
+                `<span class="onboarding-dot${i === onboardingStep ? " active" : ""}"></span>`
+        ).join("");
+    }
+
+    if (onboardingBack) {
+        onboardingBack.classList.toggle("hidden", onboardingStep === 0);
+    }
+    if (onboardingNext) {
+        onboardingNext.textContent = isLast ? "Начать с Метрик" : "Далее";
+    }
+}
+
+function openOnboarding({ force = false } = {}) {
+    if (!onboardingEl) return;
+    if (!force && isOnboardingDone()) return;
+    if (typeof isInterviewActive === "function" && isInterviewActive()) return;
+    if (typeof isUnitCalcActive === "function" && isUnitCalcActive()) return;
+    if (typeof isUnitLabActive === "function" && isUnitLabActive()) return;
+    if (!quizScreen.classList.contains("hidden") || !resultsScreen.classList.contains("hidden")) {
+        return;
+    }
+
+    closeQuizSetup({ resetRoute: false });
+
+    onboardingStep = 0;
+    renderOnboardingStep();
+    onboardingPrevFocus = document.activeElement;
+    lockBodyForQuizSetup();
+    onboardingEl.classList.remove("hidden");
+
+    requestAnimationFrame(() => {
+        (onboardingNext || onboardingCard || onboardingClose)?.focus?.();
+    });
+
+    if (typeof trackMetrika === "function") {
+        trackMetrika("onboarding_view", { force: force ? 1 : 0 });
+    }
+}
+
+function closeOnboarding({ markDone = true, reason = "close", track = true } = {}) {
+    if (!isOnboardingOpen()) return;
+    onboardingEl.classList.add("hidden");
+    unlockBodyForQuizSetup();
+    if (markDone) markOnboardingDone();
+    restoreOnboardingFocus();
+    if (track && typeof trackMetrika === "function") {
+        trackMetrika("onboarding_dismiss", { reason });
+    }
+}
+
+function startQuickStart({ fromOnboarding = false } = {}) {
+    if (!canLeaveCurrentFlow("quick_start")) return;
+
+    // complete уже отправили с CTA — dismiss не дублируем
+    closeOnboarding({
+        markDone: true,
+        reason: fromOnboarding ? "quick_start" : "close",
+        track: !fromOnboarding
+    });
+    closeQuizSetup({ resetRoute: false });
+
+    const pool = QUESTIONS.filter((q) => q.topic === "Метрики" && q.mode === "определение");
+    if (!pool.length) {
+        alert("Нет вопросов для быстрого старта.");
+        return;
+    }
+
+    if (typeof trackMetrika === "function") {
+        trackMetrika("quick_start", {
+            topic: "Метрики",
+            mode: "определение",
+            length: "quick",
+            from_onboarding: fromOnboarding ? 1 : 0
+        });
+    }
+
+    // Без полного showMainView — launchQuiz сам скрывает главные экраны
+    if (typeof closeInterview === "function") closeInterview();
+    if (typeof closeUnitCalc === "function") closeUnitCalc();
+    if (typeof closeUnitLab === "function") closeUnitLab();
+
+    launchQuiz({
+        pool,
+        topic: "Метрики",
+        mode: "определение",
+        length: "quick",
+        quizType: "topic"
+    });
+}
+
+function maybeShowOnboarding() {
+    if (isOnboardingDone()) return;
+    if (isApplyingRoute) return;
+    // Не перебиваем deep-link / активную сессию
+    const url = getCurrentUrl();
+    if (url.startsWith("/train/")) return;
+    if (!quizSetup.classList.contains("hidden")) return;
+    if (!quizScreen.classList.contains("hidden") || !resultsScreen.classList.contains("hidden")) {
+        return;
+    }
+    openOnboarding({ force: false });
+}
+
+onboardingNext?.addEventListener("click", () => {
+    if (onboardingStep < ONBOARDING_STEPS.length - 1) {
+        onboardingStep++;
+        renderOnboardingStep();
+        onboardingNext?.focus?.();
+        return;
+    }
+    if (typeof trackMetrika === "function") {
+        trackMetrika("onboarding_complete");
+    }
+    startQuickStart({ fromOnboarding: true });
+});
+
+onboardingBack?.addEventListener("click", () => {
+    if (onboardingStep <= 0) return;
+    onboardingStep--;
+    renderOnboardingStep();
+    (onboardingBack.classList.contains("hidden") ? onboardingNext : onboardingBack)?.focus?.();
+});
+
+onboardingSkip?.addEventListener("click", () => {
+    closeOnboarding({ markDone: true, reason: "skip" });
+});
+onboardingClose?.addEventListener("click", () => {
+    closeOnboarding({ markDone: true, reason: "close" });
+});
+onboardingBackdrop?.addEventListener("click", () => {
+    // Случайный тап по фону не должен навсегда скрыть онбординг
+    closeOnboarding({ markDone: false, reason: "backdrop", track: true });
+});
+
+document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || !isOnboardingOpen()) return;
+    e.preventDefault();
+    closeOnboarding({ markDone: false, reason: "escape", track: true });
+});
+
+btnQuickStart?.addEventListener("click", () => startQuickStart({ fromOnboarding: false }));
+btnHowTo?.addEventListener("click", () => openOnboarding({ force: true }));
+
 window.addEventListener("popstate", () => {
     if (!canLeaveCurrentFlow("browser_back")) {
         history.pushState({}, "", currentAppUrl);
         return;
+    }
+    if (isOnboardingOpen()) {
+        closeOnboarding({ markDone: false, reason: "nav", track: true });
     }
     applyCurrentRoute({ replace: true });
 });
@@ -2198,3 +2460,4 @@ window.addEventListener("pagehide", () => {
 });
 
 applyCurrentRoute({ replace: true });
+maybeShowOnboarding();

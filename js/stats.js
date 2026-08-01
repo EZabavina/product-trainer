@@ -19,6 +19,15 @@ function saveStats(data) {
 
 function recordSession(topic, score, total, mode = null, extras = {}) {
     const data = loadStats();
+    let percent;
+    if (Object.prototype.hasOwnProperty.call(extras, "percent")) {
+        percent = extras.percent;
+    } else if (typeof total === "number" && total > 0 && typeof score === "number") {
+        percent = Math.round((score / total) * 100);
+    } else {
+        percent = null;
+    }
+
     data.sessions.push({
         id: Date.now(),
         topic,
@@ -26,12 +35,31 @@ function recordSession(topic, score, total, mode = null, extras = {}) {
         sessionLength: extras.sessionLength || undefined,
         quizType: extras.quizType || undefined,
         sessionId: extras.sessionId || undefined,
-        score,
-        total,
-        percent: total > 0 ? Math.round((score / total) * 100) : 0,
+        score: score == null ? undefined : score,
+        total: total == null ? undefined : total,
+        percent,
         date: new Date().toISOString()
     });
     saveStats(data);
+}
+
+/** Сессии с осмысленным % (не симулятор интервью). */
+function sessionHasPercentScore(session) {
+    if (!session) return false;
+    if (session.quizType === "interview") return false;
+    return typeof session.percent === "number" && !Number.isNaN(session.percent);
+}
+
+function averageSessionPercent(sessions) {
+    const scored = (sessions || []).filter(sessionHasPercentScore);
+    if (!scored.length) return null;
+    return Math.round(scored.reduce((sum, s) => sum + s.percent, 0) / scored.length);
+}
+
+function bestSessionPercent(sessions) {
+    const scored = (sessions || []).filter(sessionHasPercentScore);
+    if (!scored.length) return null;
+    return Math.max(...scored.map((s) => s.percent));
 }
 
 function getSessionTopicLabel(session) {
@@ -85,19 +113,13 @@ function getOverview() {
     const sessions = loadStats().sessions;
     const today = sessions.filter((s) => isToday(s.date));
     const total = sessions.length;
-    const avgPercent =
-        total > 0
-            ? Math.round(sessions.reduce((sum, s) => sum + s.percent, 0) / total)
-            : 0;
-    const bestPercent = total > 0 ? Math.max(...sessions.map((s) => s.percent)) : 0;
+    const avgPercent = averageSessionPercent(sessions);
+    const bestPercent = bestSessionPercent(sessions);
     const streak = getStreak(sessions);
 
     return {
         todayCount: today.length,
-        todayAvg:
-            today.length > 0
-                ? Math.round(today.reduce((sum, s) => sum + s.percent, 0) / today.length)
-                : null,
+        todayAvg: averageSessionPercent(today),
         total,
         avgPercent,
         bestPercent,
@@ -143,12 +165,7 @@ function getActivityDays(days = 14) {
             date: key,
             label: d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" }),
             count: daySessions.length,
-            avg:
-                daySessions.length > 0
-                    ? Math.round(
-                          daySessions.reduce((sum, s) => sum + s.percent, 0) / daySessions.length
-                      )
-                    : null
+            avg: averageSessionPercent(daySessions)
         });
     }
     return result;
@@ -169,13 +186,11 @@ function getTodayHourly() {
 function getTopicStats() {
     return getActiveTopics().map((topic) => {
         const sessions = loadStats().sessions.filter((s) => s.topic === topic.name);
+        const scored = sessions.filter(sessionHasPercentScore);
         const count = sessions.length;
-        const avg =
-            count > 0
-                ? Math.round(sessions.reduce((sum, s) => sum + s.percent, 0) / count)
-                : null;
-        const best = count > 0 ? Math.max(...sessions.map((s) => s.percent)) : null;
-        const last = count > 0 ? sessions[sessions.length - 1] : null;
+        const avg = averageSessionPercent(sessions);
+        const best = bestSessionPercent(sessions);
+        const last = scored.length > 0 ? scored[scored.length - 1] : null;
 
         return { ...topic, count, avg, best, last };
     });

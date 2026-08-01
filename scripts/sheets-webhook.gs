@@ -13,12 +13,12 @@
  * 4. После правок кода — новое развёртывание (новая версия) или
  *    «Управлять развёртываниями» → карандаш → Новая версия.
  *
- * Если колонок questionText / selectedText / correctText нет:
- *   выберите функцию fixHeaders → Выполнить (один раз),
- *   затем снова сделайте Новую версию развёртывания.
+ * Если колонки/данные съехали:
+ *   выберите fixHeaders → Выполнить (один раз),
+ *   затем Новую версию развёртывания.
  *
- * Важно: Sheet.getRange(row, column, numRows, numColumns) —
- * 3-й и 4-й аргументы это РАЗМЕР, не конечная ячейка.
+ * Sheet.getRange(row, column, numRows, numColumns) — 3-й/4-й аргументы
+ * это РАЗМЕР диапазона, не конечная ячейка.
  */
 
 var SHEET_NAME = "events";
@@ -43,6 +43,14 @@ var EVENT_HEADERS = [
   "percent",
   "source"
 ];
+
+var KNOWN_TOPICS = {
+  "Метрики": true,
+  "Финансовая модель": true,
+  "Юнит-экономика": true,
+  JTBD: true,
+  CustDev: true
+};
 
 function normalizeHeader(value) {
   return String(value || "").trim();
@@ -83,51 +91,123 @@ function headerIndex(existing, name) {
 }
 
 /**
- * Приводит лист к актуальной схеме колонок.
- * Всегда гарантирует наличие questionText / selectedText / correctText
- * сразу после selectedIndex.
+ * Бывает после «починки» только заголовков: в колонке questionText лежит topic.
+ * Тогда вставляем 3 пустые колонки после selectedIndex и выравниваем шапку.
+ */
+function looksLikeTopicInQuestionTextColumn(sheet) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    return false;
+  }
+
+  var sampleSize = Math.min(40, lastRow - 1);
+  var startRow = lastRow - sampleSize + 1;
+  // SIZE form: (row, column, numRows, numColumns)
+  var types = sheet.getRange(startRow, 3, sampleSize, 1).getValues();
+  var questionTexts = sheet.getRange(startRow, 7, sampleSize, 1).getValues();
+  var topics = sheet.getRange(startRow, 10, sampleSize, 1).getValues();
+
+  var answers = 0;
+  var misaligned = 0;
+
+  for (var i = 0; i < sampleSize; i++) {
+    if (String(types[i][0] || "") !== "answer") {
+      continue;
+    }
+    answers++;
+    var qText = String(questionTexts[i][0] || "").trim();
+    var topic = String(topics[i][0] || "").trim();
+    if (KNOWN_TOPICS[qText] && (!topic || topic.length < 2)) {
+      misaligned++;
+    }
+  }
+
+  return answers >= 2 && misaligned >= Math.max(2, Math.ceil(answers * 0.4));
+}
+
+function clearExtraHeaderCells(sheet) {
+  var lastCol = sheet.getLastColumn();
+  if (lastCol > EVENT_HEADERS.length) {
+    headerRange(sheet, EVENT_HEADERS.length + 1, lastCol - EVENT_HEADERS.length).clearContent();
+  }
+}
+
+/**
+ * Приводит лист к схеме EVENT_HEADERS и чинит съехавшие данные.
  */
 function ensureEventHeaders(sheet) {
   if (sheet.getLastRow() === 0 || sheet.getLastColumn() === 0) {
     headerRange(sheet, 1, EVENT_HEADERS.length).setValues([EVENT_HEADERS]);
-    return;
+    return { repaired: false, reason: "init" };
   }
 
   var existing = readHeaderRow(sheet);
-  if (headersMatch(existing, EVENT_HEADERS)) {
-    return;
-  }
-
   var textIdx = headerIndex(existing, "questionText");
   var topicIdx = headerIndex(existing, "topic");
   var selectedIdx = headerIndex(existing, "selectedIndex");
 
-  // Ошибочная миграция: topic всё ещё на месте 7, а в хвосте дубли total/percent/source
-  if (
-    textIdx < 0 &&
-    topicIdx === 6 &&
-    existing.length >= EVENT_HEADERS.length &&
-    normalizeHeader(existing[15]) === "total" &&
-    normalizeHeader(existing[16]) === "percent" &&
-    normalizeHeader(existing[17]) === "source"
-  ) {
-    headerRange(sheet, 7, 3).setValues([["questionText", "selectedText", "correctText"]]);
-    if (existing.length > EVENT_HEADERS.length) {
-      headerRange(sheet, EVENT_HEADERS.length + 1, existing.length - EVENT_HEADERS.length).clearContent();
-    }
+  // Канонические заголовки, но данные не сдвигали (topic в колонке questionText)
+  if (headersMatch(existing, EVENT_HEADERS) && looksLikeTopicInQuestionTextColumn(sheet)) {
+    sheet.insertColumns(7, 3);
     headerRange(sheet, 1, EVENT_HEADERS.length).setValues([EVENT_HEADERS]);
-    return;
+    clearExtraHeaderCells(sheet);
+    return { repaired: true, reason: "shift-misaligned-data" };
   }
 
-  // Старая схема без текстовых колонок: вставляем 3 колонки после selectedIndex
-  if (textIdx < 0) {
-    var insertAt = selectedIdx >= 0 ? selectedIdx + 2 : 7; // 1-based column index
+  if (headersMatch(existing, EVENT_HEADERS)) {
+    clearExtraHeaderCells(sheet);
+    return { repaired: false, reason: "ok" };
+  }
+
+  // Старая схема: topic сразу после selectedIndex — вставляем 3 колонки под тексты
+  if (textIdx < 0 && (topicIdx === 6 || normalizeHeader(existing[6]) === "topic")) {
+    var insertAt = selectedIdx >= 0 ? selectedIdx + 2 : 7;
     sheet.insertColumns(insertAt, 3);
-    headerRange(sheet, insertAt, 3).setValues([["questionText", "selectedText", "correctText"]]);
+    headerRange(sheet, 1, EVENT_HEADERS.length).setValues([EVENT_HEADERS]);
+    clearExtraHeaderCells(sheet);
+    return { repaired: true, reason: "insert-text-columns" };
   }
 
-  // Финально выравниваем заголовки под канонический порядок
+  // Нет текстовых колонок в другом порядке — вставляем после selectedIndex
+  if (textIdx < 0) {
+    var at = selectedIdx >= 0 ? selectedIdx + 2 : 7;
+    sheet.insertColumns(at, 3);
+  }
+
   headerRange(sheet, 1, EVENT_HEADERS.length).setValues([EVENT_HEADERS]);
+  clearExtraHeaderCells(sheet);
+  return { repaired: true, reason: "normalize-headers" };
+}
+
+/**
+ * Строка строго по именам заголовков — не зависит от порядка колонок.
+ */
+function buildEventRow(headers, event, source) {
+  var values = {
+    receivedAt: event.receivedAt || new Date().toISOString(),
+    date: event.date || "",
+    type: event.type || "",
+    questionId: event.questionId != null ? event.questionId : "",
+    correct: event.correct === true ? "TRUE" : event.correct === false ? "FALSE" : "",
+    selectedIndex: event.selectedIndex != null ? event.selectedIndex : "",
+    questionText: event.questionText != null ? String(event.questionText) : "",
+    selectedText: event.selectedText != null ? String(event.selectedText) : "",
+    correctText: event.correctText != null ? String(event.correctText) : "",
+    topic: event.topic || "",
+    mode: event.mode || "",
+    quizType: event.quizType || "",
+    sessionId: event.sessionId || "",
+    sessionLength: event.sessionLength || "",
+    score: event.score != null ? event.score : "",
+    total: event.total != null ? event.total : "",
+    percent: event.percent != null ? event.percent : "",
+    source: source || "product-trainer"
+  };
+
+  return headers.map(function (name) {
+    var key = normalizeHeader(name);
+    return Object.prototype.hasOwnProperty.call(values, key) ? values[key] : "";
+  });
 }
 
 /**
@@ -143,7 +223,9 @@ function fixHeaders() {
   if (!sheet) {
     sheet = ss.insertSheet(SHEET_NAME);
   }
-  ensureEventHeaders(sheet);
+  var result = ensureEventHeaders(sheet);
+  Logger.log(JSON.stringify(result));
+  return result;
 }
 
 function doPost(e) {
@@ -173,27 +255,24 @@ function doPost(e) {
     }
 
     ensureEventHeaders(sheet);
+    var headers = readHeaderRow(sheet);
+    if (!headersMatch(headers, EVENT_HEADERS)) {
+      headerRange(sheet, 1, EVENT_HEADERS.length).setValues([EVENT_HEADERS]);
+      headers = EVENT_HEADERS.slice();
+    } else {
+      headers = EVENT_HEADERS.slice();
+    }
 
-    sheet.appendRow([
-      event.receivedAt || new Date().toISOString(),
-      event.date || "",
-      event.type || "",
-      event.questionId != null ? event.questionId : "",
-      event.correct === true ? "TRUE" : event.correct === false ? "FALSE" : "",
-      event.selectedIndex != null ? event.selectedIndex : "",
-      event.questionText || "",
-      event.selectedText || "",
-      event.correctText || "",
-      event.topic || "",
-      event.mode || "",
-      event.quizType || "",
-      event.sessionId || "",
-      event.sessionLength || "",
-      event.score != null ? event.score : "",
-      event.total != null ? event.total : "",
-      event.percent != null ? event.percent : "",
-      body.source || "product-trainer"
-    ]);
+    // Нормализуем тексты: null/undefined → ""
+    event.questionText = event.questionText == null ? "" : String(event.questionText);
+    event.selectedText = event.selectedText == null ? "" : String(event.selectedText);
+    event.correctText = event.correctText == null ? "" : String(event.correctText);
+
+    if (event.type === "answer" && !event.questionText) {
+      Logger.log("answer without questionText, questionId=" + event.questionId);
+    }
+
+    sheet.appendRow(buildEventRow(headers, event, body.source || "product-trainer"));
 
     return jsonOut({ ok: true });
   } catch (err) {
@@ -206,7 +285,7 @@ function doGet() {
 }
 
 function jsonOut(obj) {
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(
+    ContentService.MimeType.JSON
+  );
 }
