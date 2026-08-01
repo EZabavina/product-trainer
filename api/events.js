@@ -142,10 +142,15 @@ export default async function handler(req, res) {
             forwarded: true,
             hasWebhook: true,
             upstreamStatus: upstream.status,
-            // для отладки в Network: тексты реально ушли
             hasQuestionText: Boolean(sanitized.questionText),
             hasSelectedText: Boolean(sanitized.selectedText),
-            hasCorrectText: Boolean(sanitized.correctText)
+            hasCorrectText: Boolean(sanitized.correctText),
+            questionTextPreview: sanitized.questionText
+                ? String(sanitized.questionText).slice(0, 80)
+                : null,
+            upstreamSnippet: upstream.snippet
+                ? String(upstream.snippet).slice(0, 120)
+                : null
         });
     } catch (err) {
         console.error("Events API error:", err);
@@ -157,48 +162,69 @@ export default async function handler(req, res) {
 }
 
 /**
- * POST на Apps Script с ручным follow редиректов (сохраняем метод POST).
+ * POST на Apps Script.
+ *
+ * /exec отвечает 302 на googleusercontent echo-URL.
+ * doPost УЖЕ выполнен на первом запросе; follow должен быть GET
+ * (повторный POST на echo даёт 405 и ломает проверку успеха).
  */
 async function postToAppsScript(url, payload, maxRedirects = 5) {
     let current = url;
-    let lastStatus = 0;
+
+    const response = await fetch(current, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: payload,
+        redirect: "manual"
+    });
+
+    let lastStatus = response.status;
     let snippet = "";
+    const location = response.headers.get("location");
 
-    for (let i = 0; i <= maxRedirects; i++) {
-        const response = await fetch(current, {
-            method: "POST",
-            // text/plain — привычный обход для GAS; содержимое всё равно JSON-строка
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: payload,
-            redirect: "manual"
-        });
-
-        lastStatus = response.status;
-        const location = response.headers.get("location");
-
-        if ([301, 302, 303, 307, 308].includes(response.status) && location) {
-            current = new URL(location, current).toString();
-            continue;
+    if ([301, 302, 303, 307, 308].includes(response.status) && location) {
+        // Скрипт уже отработал — читаем тело ответа через GET
+        let echoUrl = new URL(location, current).toString();
+        for (let i = 0; i < maxRedirects; i++) {
+            const echoRes = await fetch(echoUrl, {
+                method: "GET",
+                redirect: "manual"
+            });
+            lastStatus = echoRes.status;
+            const nextLoc = echoRes.headers.get("location");
+            if ([301, 302, 303, 307, 308].includes(echoRes.status) && nextLoc) {
+                echoUrl = new URL(nextLoc, echoUrl).toString();
+                continue;
+            }
+            const text = await echoRes.text().catch(() => "");
+            snippet = String(text).replace(/\s+/g, " ").slice(0, 240);
+            break;
         }
-
+    } else {
         const text = await response.text().catch(() => "");
-        snippet = String(text).replace(/\s+/g, " ").slice(0, 180);
-
-        // GAS иногда отдаёт 200 с HTML-страницей авторизации
-        if (response.status >= 400) {
-            return { ok: false, status: response.status, snippet };
-        }
-
-        if (/Sign in|accounts\.google|Unauthorized|идентификац/i.test(snippet)) {
-            return { ok: false, status: response.status || 401, snippet };
-        }
-
-        if (snippet && /"ok"\s*:\s*false/i.test(snippet)) {
-            return { ok: false, status: response.status, snippet };
-        }
-
-        return { ok: true, status: response.status, snippet };
+        snippet = String(text).replace(/\s+/g, " ").slice(0, 240);
     }
 
-    return { ok: false, status: lastStatus || 310, snippet: "too many redirects" };
+    if (lastStatus >= 400 && !snippet) {
+        return { ok: false, status: lastStatus, snippet: "upstream error" };
+    }
+
+    if (/Sign in|accounts\.google|Unauthorized|идентификац/i.test(snippet)) {
+        return { ok: false, status: lastStatus || 401, snippet };
+    }
+
+    if (snippet && /"ok"\s*:\s*false/i.test(snippet)) {
+        return { ok: false, status: lastStatus, snippet };
+    }
+
+    // 302 без читаемого тела: doPost всё равно уже выполнен
+    if (!snippet && [301, 302, 303].includes(response.status)) {
+        return { ok: true, status: response.status, snippet: "accepted-via-redirect" };
+    }
+
+    if (lastStatus >= 400) {
+        return { ok: false, status: lastStatus, snippet };
+    }
+
+    return { ok: true, status: lastStatus || response.status, snippet };
 }

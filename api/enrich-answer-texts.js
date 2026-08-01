@@ -1,19 +1,23 @@
 /**
  * Дополняет answer-события текстами вопроса/ответов по questionId.
- * Нужен как страховка: если клиент не прислал тексты, Sheets всё равно получит их.
+ * Страховка: если клиент не прислал тексты, Sheets всё равно получит их.
  */
 import { existsSync, readFileSync } from "fs";
-import { join } from "path";
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
 
 let questionsCache = null;
 
 function loadQuestionsBank() {
     if (questionsCache) return questionsCache;
 
+    const here = dirname(fileURLToPath(import.meta.url));
     const candidates = [
+        join(here, "..", "js", "questions.js"),
+        join(here, "questions.js"),
         join(process.cwd(), "js", "questions.js"),
-        join(process.cwd(), "..", "js", "questions.js"),
-        join(process.cwd(), "public", "js", "questions.js")
+        join(process.cwd(), "public", "js", "questions.js"),
+        join(process.cwd(), "questions.js")
     ];
 
     for (const path of candidates) {
@@ -23,12 +27,14 @@ function loadQuestionsBank() {
             questionsCache = JSON.parse(
                 raw.replace(/^const QUESTIONS\s*=\s*/, "").replace(/;?\s*$/, "")
             );
+            console.log("[events] questions bank loaded:", path, "count=", questionsCache.length);
             return questionsCache;
         } catch (err) {
             console.warn("Failed to parse questions bank at", path, err?.message || err);
         }
     }
 
+    console.warn("[events] questions bank NOT found; tried:", candidates.join(" | "));
     questionsCache = [];
     return questionsCache;
 }
@@ -41,7 +47,7 @@ function asTrimmedString(value, max) {
 }
 
 /**
- * @param {object} event — уже частично sanitized
+ * @param {object} event
  * @returns {object}
  */
 export function enrichAnswerTexts(event) {
@@ -52,12 +58,7 @@ export function enrichAnswerTexts(event) {
     let correctText = asTrimmedString(event.correctText, 300);
 
     if (questionText && selectedText && correctText) {
-        return {
-            ...event,
-            questionText,
-            selectedText,
-            correctText
-        };
+        return { ...event, questionText, selectedText, correctText };
     }
 
     const id = event.questionId;
@@ -96,10 +97,6 @@ export function enrichAnswerTexts(event) {
     if (!correctText) correctText = asTrimmedString(q.options?.[q.correct], 300);
     if (!selectedText && typeof event.selectedIndex === "number") {
         selectedText = asTrimmedString(q.options?.[event.selectedIndex], 300);
-    }
-
-    if (!questionText || !correctText) {
-        console.warn("[events] enrich incomplete for questionId", id);
     }
 
     return {
