@@ -11,7 +11,27 @@ function loadMistakeBank() {
 }
 
 function saveMistakeBank(data) {
-    localStorage.setItem(MISTAKES_KEY, JSON.stringify(data));
+    try {
+        localStorage.setItem(MISTAKES_KEY, JSON.stringify(data));
+    } catch (err) {
+        // Не даём падению банка ошибок блокировать аналитику / UI
+        console.warn("saveMistakeBank failed:", err);
+        try {
+            // Попробуем ужать банк и сохранить ещё раз
+            const keys = Object.keys(data.items || {});
+            if (keys.length > 50) {
+                const sorted = keys.sort(
+                    (a, b) => new Date(data.items[b].date) - new Date(data.items[a].date)
+                );
+                data.items = Object.fromEntries(
+                    sorted.slice(0, 50).map((k) => [k, data.items[k]])
+                );
+                localStorage.setItem(MISTAKES_KEY, JSON.stringify(data));
+            }
+        } catch (err2) {
+            console.warn("saveMistakeBank retry failed:", err2);
+        }
+    }
 }
 
 function getValidQuestionIds() {

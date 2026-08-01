@@ -15,10 +15,20 @@ function loadAnswerLog() {
 }
 
 function saveAnswerLog(data) {
-    if (data.events.length > MAX_ANSWER_EVENTS) {
-        data.events = data.events.slice(-MAX_ANSWER_EVENTS);
+    try {
+        if (data.events.length > MAX_ANSWER_EVENTS) {
+            data.events = data.events.slice(-MAX_ANSWER_EVENTS);
+        }
+        localStorage.setItem(ANSWERS_KEY, JSON.stringify(data));
+    } catch (err) {
+        console.warn("saveAnswerLog quota/error:", err);
+        try {
+            data.events = data.events.slice(-Math.min(500, MAX_ANSWER_EVENTS));
+            localStorage.setItem(ANSWERS_KEY, JSON.stringify(data));
+        } catch (err2) {
+            console.warn("saveAnswerLog retry failed:", err2);
+        }
     }
-    localStorage.setItem(ANSWERS_KEY, JSON.stringify(data));
 }
 
 function clearAnswerLog() {
@@ -143,10 +153,21 @@ function recordAnswerOutcome(payload) {
         console.warn("[answers] missing texts for questionId", event.questionId, event);
     }
 
-    const data = loadAnswerLog();
-    data.events.push(event);
-    saveAnswerLog(data);
-    sendAnalyticsEvent(event);
+    // Сначала сеть — локальный лог не должен блокировать отправку неверных ответов
+    try {
+        sendAnalyticsEvent(event);
+    } catch (err) {
+        console.warn("sendAnalyticsEvent failed:", err);
+    }
+
+    try {
+        const data = loadAnswerLog();
+        data.events.push(event);
+        saveAnswerLog(data);
+    } catch (err) {
+        console.warn("saveAnswerLog failed:", err);
+    }
+
     return event;
 }
 

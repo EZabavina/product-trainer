@@ -1831,34 +1831,47 @@ function revealAnswer(selectedIndex, { recordOutcome = true } = {}) {
     currentSelectedIndex = selectedIndex;
 
     if (recordOutcome) {
-        if (isCorrect) {
-            score++;
-            clearMistake(q.id);
-        } else {
-            recordMistake(q);
-        }
-
+        // Сначала аналитика — иначе ошибка в банке ошибок (QuotaExceeded и т.п.)
+        // съест неверный ответ и он не уйдёт в Sheets.
         if (typeof recordAnswerOutcome === "function") {
             const planned = quizQuestions.length;
-            recordAnswerOutcome({
-                questionId: q.id,
-                correct: isCorrect,
-                selectedIndex,
-                questionText: q.question,
-                selectedText: q.options[selectedIndex],
-                correctText: q.options[q.correct],
-                topic: q.topic,
-                mode: q.mode || currentTopicMode || null,
-                quizType: currentQuizType,
-                sessionId: currentQuizSessionId,
-                sessionLength: currentSessionLength || null,
-                score,
-                total: planned,
-                percent: planned ? Math.round((score / planned) * 100) : null
-            });
+            try {
+                recordAnswerOutcome({
+                    questionId: q.id,
+                    correct: isCorrect,
+                    selectedIndex,
+                    questionText: q.question,
+                    selectedText: q.options[selectedIndex],
+                    correctText: q.options[q.correct],
+                    topic: q.topic,
+                    mode: q.mode || currentTopicMode || null,
+                    quizType: currentQuizType,
+                    sessionId: currentQuizSessionId,
+                    sessionLength: currentSessionLength || null,
+                    score: isCorrect ? score + 1 : score,
+                    total: planned,
+                    percent: planned
+                        ? Math.round(((isCorrect ? score + 1 : score) / planned) * 100)
+                        : null
+                });
+            } catch (err) {
+                console.warn("recordAnswerOutcome failed:", err);
+            }
         }
 
-        if (!isCorrect) {
+        if (isCorrect) {
+            score++;
+            try {
+                clearMistake(q.id);
+            } catch (err) {
+                console.warn("clearMistake failed:", err);
+            }
+        } else {
+            try {
+                recordMistake(q);
+            } catch (err) {
+                console.warn("recordMistake failed:", err);
+            }
             wrongAnswers.push({
                 id: q.id,
                 topic: q.topic,
