@@ -31,7 +31,8 @@ const EVENT_HEADERS = [
     "score",
     "total",
     "percent",
-    "source"
+    "source",
+    "schemaVersion"
 ];
 
 function buildEventRow(headers, event, source) {
@@ -53,9 +54,12 @@ function buildEventRow(headers, event, source) {
         score: event.score != null ? event.score : "",
         total: event.total != null ? event.total : "",
         percent: event.percent != null ? event.percent : "",
-        source: source || "product-trainer"
+        source: source || "product-trainer",
+        schemaVersion: 4
     };
-    return headers.map((name) => (Object.prototype.hasOwnProperty.call(values, name) ? values[name] : ""));
+    return headers.map((name) =>
+        Object.prototype.hasOwnProperty.call(values, name) ? values[name] : ""
+    );
 }
 
 function textOrNull(value, max) {

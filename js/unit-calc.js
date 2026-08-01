@@ -234,7 +234,13 @@ function checkUnitCalcAnswers() {
             topic: "Юнит-экономика",
             mode: "calc",
             quizType: "unit-calc",
-            sessionId: unitCalcSessionId
+            sessionId: unitCalcSessionId,
+            sessionLength: unitCalcLength || null,
+            score: unitCalcScore,
+            total: unitCalcQueue.length,
+            percent: unitCalcQueue.length
+                ? Math.round((unitCalcScore / unitCalcQueue.length) * 100)
+                : null
         });
     }
 

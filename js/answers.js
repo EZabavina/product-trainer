@@ -132,6 +132,10 @@ function recordAnswerOutcome(payload) {
         mode: payload.mode || null,
         quizType: payload.quizType || "topic",
         sessionId: payload.sessionId || null,
+        sessionLength: payload.sessionLength || null,
+        score: typeof payload.score === "number" ? payload.score : null,
+        total: typeof payload.total === "number" ? payload.total : null,
+        percent: typeof payload.percent === "number" ? payload.percent : null,
         date: new Date().toISOString()
     };
 

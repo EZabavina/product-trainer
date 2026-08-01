@@ -1839,6 +1839,7 @@ function revealAnswer(selectedIndex, { recordOutcome = true } = {}) {
         }
 
         if (typeof recordAnswerOutcome === "function") {
+            const planned = quizQuestions.length;
             recordAnswerOutcome({
                 questionId: q.id,
                 correct: isCorrect,
@@ -1849,7 +1850,11 @@ function revealAnswer(selectedIndex, { recordOutcome = true } = {}) {
                 topic: q.topic,
                 mode: q.mode || currentTopicMode || null,
                 quizType: currentQuizType,
-                sessionId: currentQuizSessionId
+                sessionId: currentQuizSessionId,
+                sessionLength: currentSessionLength || null,
+                score,
+                total: planned,
+                percent: planned ? Math.round((score / planned) * 100) : null
             });
         }
 

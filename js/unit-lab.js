@@ -386,7 +386,13 @@ function checkUnitLabChallenge() {
             topic: "Юнит-экономика",
             mode: "lab",
             quizType: "unit-lab",
-            sessionId: unitLabSessionId
+            sessionId: unitLabSessionId,
+            sessionLength: "standard",
+            score: unitLabScore,
+            total: UNIT_LAB_CHALLENGES.length,
+            percent: UNIT_LAB_CHALLENGES.length
+                ? Math.round((unitLabScore / UNIT_LAB_CHALLENGES.length) * 100)
+                : null
         });
     }
 

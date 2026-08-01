@@ -1,28 +1,29 @@
 /**
- * Google Apps Script для записи ответов в Google Sheets.
+ * Google Apps Script → лист "events".
  *
- * ВАЖНО: скрипт должен быть привязан к таблице
- * (в нужной Sheets: Расширения → Apps Script), не отдельный проект.
+ * SCHEMA_VERSION = 4
+ * Проверка, что стоит НОВЫЙ код: откройте URL /exec в браузере.
+ * Должно быть: {"ok":true,"service":"product-trainer-sheets","schemaVersion":4}
+ * Если schemaVersion нет — вы смотрите СТАРОЕ развёртывание. Сделайте Новую версию.
  *
- * Установка:
- * 1. Откройте таблицу → Расширения → Apps Script → вставьте этот код.
- * 2. Развернуть → Новое развёртывание → Веб-приложение:
- *    - Выполнять от: меня
- *    - Доступ: Все
- * 3. Скопируйте URL (.../exec) в Vercel: EVENTS_WEBHOOK_URL
- * 4. После правок кода — новое развёртывание (новая версия) или
- *    «Управлять развёртываниями» → карандаш → Новая версия.
+ * Установка / обновление:
+ * 1. Таблица → Расширения → Apps Script → замените ВЕСЬ код этим файлом.
+ * 2. Сохранить.
+ * 3. Выберите fixHeaders → Выполнить.
+ * 4. Развернуть → Управление развёртываниями → карандаш → Новая версия → Развернуть.
+ *    (просто «Сохранить» в редакторе НЕ обновляет /exec!)
+ * 5. URL .../exec → Vercel env EVENTS_WEBHOOK_URL → Redeploy.
  *
- * Если колонки/данные съехали:
- *   выберите fixHeaders → Выполнить (один раз),
- *   затем Новую версию развёртывания.
- *
- * Sheet.getRange(row, column, numRows, numColumns) — 3-й/4-й аргументы
- * это РАЗМЕР диапазона, не конечная ячейка.
+ * Sheet.getRange(row, column, numRows, numColumns) — 3/4 аргументы = РАЗМЕР.
  */
 
 var SHEET_NAME = "events";
+var SCHEMA_VERSION = 4;
 
+/**
+ * Канонический порядок колонок.
+ * questionText / selectedText / correctText — ТЕКСТЫ, не topic/mode/quizType.
+ */
 var EVENT_HEADERS = [
   "receivedAt",
   "date",
@@ -41,7 +42,8 @@ var EVENT_HEADERS = [
   "score",
   "total",
   "percent",
-  "source"
+  "source",
+  "schemaVersion"
 ];
 
 var KNOWN_TOPICS = {
@@ -56,7 +58,6 @@ function normalizeHeader(value) {
   return String(value || "").trim();
 }
 
-/** Диапазон 1×N начиная с колонки startCol (1-based). */
 function headerRange(sheet, startCol, numCols) {
   return sheet.getRange(1, startCol, 1, numCols);
 }
@@ -70,59 +71,18 @@ function readHeaderRow(sheet) {
 }
 
 function headersMatch(existing, expected) {
-  if (existing.length < expected.length) {
-    return false;
-  }
+  if (existing.length < expected.length) return false;
   for (var i = 0; i < expected.length; i++) {
-    if (normalizeHeader(existing[i]) !== expected[i]) {
-      return false;
-    }
+    if (normalizeHeader(existing[i]) !== expected[i]) return false;
   }
   return true;
 }
 
 function headerIndex(existing, name) {
   for (var i = 0; i < existing.length; i++) {
-    if (normalizeHeader(existing[i]) === name) {
-      return i;
-    }
+    if (normalizeHeader(existing[i]) === name) return i;
   }
   return -1;
-}
-
-/**
- * Бывает после «починки» только заголовков: в колонке questionText лежит topic.
- * Тогда вставляем 3 пустые колонки после selectedIndex и выравниваем шапку.
- */
-function looksLikeTopicInQuestionTextColumn(sheet) {
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 2) {
-    return false;
-  }
-
-  var sampleSize = Math.min(40, lastRow - 1);
-  var startRow = lastRow - sampleSize + 1;
-  // SIZE form: (row, column, numRows, numColumns)
-  var types = sheet.getRange(startRow, 3, sampleSize, 1).getValues();
-  var questionTexts = sheet.getRange(startRow, 7, sampleSize, 1).getValues();
-  var topics = sheet.getRange(startRow, 10, sampleSize, 1).getValues();
-
-  var answers = 0;
-  var misaligned = 0;
-
-  for (var i = 0; i < sampleSize; i++) {
-    if (String(types[i][0] || "") !== "answer") {
-      continue;
-    }
-    answers++;
-    var qText = String(questionTexts[i][0] || "").trim();
-    var topic = String(topics[i][0] || "").trim();
-    if (KNOWN_TOPICS[qText] && (!topic || topic.length < 2)) {
-      misaligned++;
-    }
-  }
-
-  return answers >= 2 && misaligned >= Math.max(2, Math.ceil(answers * 0.4));
 }
 
 function clearExtraHeaderCells(sheet) {
@@ -133,12 +93,37 @@ function clearExtraHeaderCells(sheet) {
 }
 
 /**
- * Приводит лист к схеме EVENT_HEADERS и чинит съехавшие данные.
+ * Признаки старого appendRow: в колонке G (7) лежит название темы.
  */
+function looksLikeTopicInQuestionTextColumn(sheet) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return false;
+
+  var sampleSize = Math.min(50, lastRow - 1);
+  var startRow = lastRow - sampleSize + 1;
+  var types = sheet.getRange(startRow, 3, sampleSize, 1).getValues();
+  var col7 = sheet.getRange(startRow, 7, sampleSize, 1).getValues();
+  var col10 = sheet.getRange(startRow, 10, sampleSize, 1).getValues();
+
+  var answers = 0;
+  var misaligned = 0;
+  for (var i = 0; i < sampleSize; i++) {
+    if (String(types[i][0] || "") !== "answer") continue;
+    answers++;
+    var g = String(col7[i][0] || "").trim();
+    var j = String(col10[i][0] || "").trim();
+    // G = topic name, J пусто или не topic → старый порядок полей
+    if (KNOWN_TOPICS[g] && !KNOWN_TOPICS[j]) {
+      misaligned++;
+    }
+  }
+  return answers >= 1 && misaligned >= 1;
+}
+
 function ensureEventHeaders(sheet) {
   if (sheet.getLastRow() === 0 || sheet.getLastColumn() === 0) {
     headerRange(sheet, 1, EVENT_HEADERS.length).setValues([EVENT_HEADERS]);
-    return { repaired: false, reason: "init" };
+    return { repaired: true, reason: "init" };
   }
 
   var existing = readHeaderRow(sheet);
@@ -146,7 +131,7 @@ function ensureEventHeaders(sheet) {
   var topicIdx = headerIndex(existing, "topic");
   var selectedIdx = headerIndex(existing, "selectedIndex");
 
-  // Канонические заголовки, но данные не сдвигали (topic в колонке questionText)
+  // Заголовки «как надо», но данные старого формата → сдвиг
   if (headersMatch(existing, EVENT_HEADERS) && looksLikeTopicInQuestionTextColumn(sheet)) {
     sheet.insertColumns(7, 3);
     headerRange(sheet, 1, EVENT_HEADERS.length).setValues([EVENT_HEADERS]);
@@ -159,17 +144,11 @@ function ensureEventHeaders(sheet) {
     return { repaired: false, reason: "ok" };
   }
 
-  // Старая схема: topic сразу после selectedIndex — вставляем 3 колонки под тексты
+  // topic сразу после selectedIndex (классическая старая схема)
   if (textIdx < 0 && (topicIdx === 6 || normalizeHeader(existing[6]) === "topic")) {
     var insertAt = selectedIdx >= 0 ? selectedIdx + 2 : 7;
     sheet.insertColumns(insertAt, 3);
-    headerRange(sheet, 1, EVENT_HEADERS.length).setValues([EVENT_HEADERS]);
-    clearExtraHeaderCells(sheet);
-    return { repaired: true, reason: "insert-text-columns" };
-  }
-
-  // Нет текстовых колонок в другом порядке — вставляем после selectedIndex
-  if (textIdx < 0) {
+  } else if (textIdx < 0) {
     var at = selectedIdx >= 0 ? selectedIdx + 2 : 7;
     sheet.insertColumns(at, 3);
   }
@@ -179,109 +158,133 @@ function ensureEventHeaders(sheet) {
   return { repaired: true, reason: "normalize-headers" };
 }
 
-/**
- * Строка строго по именам заголовков — не зависит от порядка колонок.
- */
-function buildEventRow(headers, event, source) {
-  var values = {
-    receivedAt: event.receivedAt || new Date().toISOString(),
-    date: event.date || "",
-    type: event.type || "",
-    questionId: event.questionId != null ? event.questionId : "",
-    correct: event.correct === true ? "TRUE" : event.correct === false ? "FALSE" : "",
-    selectedIndex: event.selectedIndex != null ? event.selectedIndex : "",
-    questionText: event.questionText != null ? String(event.questionText) : "",
-    selectedText: event.selectedText != null ? String(event.selectedText) : "",
-    correctText: event.correctText != null ? String(event.correctText) : "",
-    topic: event.topic || "",
-    mode: event.mode || "",
-    quizType: event.quizType || "",
-    sessionId: event.sessionId || "",
-    sessionLength: event.sessionLength || "",
-    score: event.score != null ? event.score : "",
-    total: event.total != null ? event.total : "",
-    percent: event.percent != null ? event.percent : "",
-    source: source || "product-trainer"
-  };
-
-  return headers.map(function (name) {
-    var key = normalizeHeader(name);
-    return Object.prototype.hasOwnProperty.call(values, key) ? values[key] : "";
-  });
+function buildEventRow(event, source) {
+  return [
+    event.receivedAt || new Date().toISOString(),
+    event.date || "",
+    event.type || "",
+    event.questionId != null ? event.questionId : "",
+    event.correct === true ? "TRUE" : event.correct === false ? "FALSE" : "",
+    event.selectedIndex != null ? event.selectedIndex : "",
+    event.questionText != null ? String(event.questionText) : "",
+    event.selectedText != null ? String(event.selectedText) : "",
+    event.correctText != null ? String(event.correctText) : "",
+    event.topic || "",
+    event.mode || "",
+    event.quizType || "",
+    event.sessionId || "",
+    event.sessionLength || "",
+    event.score != null ? event.score : "",
+    event.total != null ? event.total : "",
+    event.percent != null ? event.percent : "",
+    source || "product-trainer",
+    SCHEMA_VERSION
+  ];
 }
 
-/**
- * Ручной запуск из редактора Apps Script:
- * выбрать fixHeaders → Выполнить.
- */
+function appendEventRow(sheet, event, source) {
+  ensureEventHeaders(sheet);
+  // Всегда перезаписываем шапку каноном — защита от ручных правок
+  headerRange(sheet, 1, EVENT_HEADERS.length).setValues([EVENT_HEADERS]);
+
+  var row = buildEventRow(event, source);
+  var nextRow = sheet.getLastRow() + 1;
+  // SIZE form: 1 строка, N колонок начиная с A
+  sheet.getRange(nextRow, 1, 1, EVENT_HEADERS.length).setValues([row]);
+}
+
 function fixHeaders() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) {
     throw new Error("Open Apps Script from the Sheet (Extensions → Apps Script).");
   }
   var sheet = ss.getSheetByName(SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.insertSheet(SHEET_NAME);
-  }
+  if (!sheet) sheet = ss.insertSheet(SHEET_NAME);
   var result = ensureEventHeaders(sheet);
+  headerRange(sheet, 1, EVENT_HEADERS.length).setValues([EVENT_HEADERS]);
+  clearExtraHeaderCells(sheet);
+  result.schemaVersion = SCHEMA_VERSION;
   Logger.log(JSON.stringify(result));
   return result;
+}
+
+/**
+ * Диагностика: последние answer-строки по именам колонок.
+ * Выполнить в редакторе: diagnoseSheet
+ */
+function diagnoseSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) {
+    return { ok: false, error: "no data" };
+  }
+  var headers = readHeaderRow(sheet);
+  var last = sheet.getLastRow();
+  var start = Math.max(2, last - 4);
+  var width = Math.min(sheet.getLastColumn(), EVENT_HEADERS.length);
+  var values = sheet.getRange(start, 1, last - start + 1, width).getValues();
+  var rows = values.map(function (r) {
+    var obj = {};
+    for (var i = 0; i < EVENT_HEADERS.length; i++) {
+      obj[EVENT_HEADERS[i]] = r[i];
+    }
+    return obj;
+  });
+  return {
+    ok: true,
+    schemaVersion: SCHEMA_VERSION,
+    headers: headers.slice(0, EVENT_HEADERS.length),
+    sample: rows
+  };
 }
 
 function doPost(e) {
   try {
     var body = {};
     var raw = e && e.postData && e.postData.contents ? e.postData.contents : "";
-    if (raw) {
-      body = JSON.parse(raw);
-    }
+    if (raw) body = JSON.parse(raw);
 
     var event = body.event || body;
     if (!event || !event.type) {
-      return jsonOut({ ok: false, error: "event.type required" });
+      return jsonOut({ ok: false, error: "event.type required", schemaVersion: SCHEMA_VERSION });
     }
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) {
       return jsonOut({
         ok: false,
-        error: "No active spreadsheet. Open Apps Script from the Sheet (Extensions → Apps Script)."
+        error: "No active spreadsheet. Open Apps Script from the Sheet.",
+        schemaVersion: SCHEMA_VERSION
       });
     }
 
     var sheet = ss.getSheetByName(SHEET_NAME);
-    if (!sheet) {
-      sheet = ss.insertSheet(SHEET_NAME);
-    }
+    if (!sheet) sheet = ss.insertSheet(SHEET_NAME);
 
-    ensureEventHeaders(sheet);
-    var headers = readHeaderRow(sheet);
-    if (!headersMatch(headers, EVENT_HEADERS)) {
-      headerRange(sheet, 1, EVENT_HEADERS.length).setValues([EVENT_HEADERS]);
-      headers = EVENT_HEADERS.slice();
-    } else {
-      headers = EVENT_HEADERS.slice();
-    }
-
-    // Нормализуем тексты: null/undefined → ""
     event.questionText = event.questionText == null ? "" : String(event.questionText);
     event.selectedText = event.selectedText == null ? "" : String(event.selectedText);
     event.correctText = event.correctText == null ? "" : String(event.correctText);
 
-    if (event.type === "answer" && !event.questionText) {
-      Logger.log("answer without questionText, questionId=" + event.questionId);
-    }
+    appendEventRow(sheet, event, body.source || "product-trainer");
 
-    sheet.appendRow(buildEventRow(headers, event, body.source || "product-trainer"));
-
-    return jsonOut({ ok: true });
+    return jsonOut({
+      ok: true,
+      schemaVersion: SCHEMA_VERSION,
+      wroteQuestionText: Boolean(event.questionText),
+      type: event.type
+    });
   } catch (err) {
-    return jsonOut({ ok: false, error: String(err) });
+    return jsonOut({ ok: false, error: String(err), schemaVersion: SCHEMA_VERSION });
   }
 }
 
 function doGet() {
-  return jsonOut({ ok: true, service: "product-trainer-sheets" });
+  return jsonOut({
+    ok: true,
+    service: "product-trainer-sheets",
+    schemaVersion: SCHEMA_VERSION,
+    headers: EVENT_HEADERS
+  });
 }
 
 function jsonOut(obj) {
