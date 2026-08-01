@@ -28,6 +28,21 @@ function recordSession(topic, score, total, mode = null, extras = {}) {
         percent = null;
     }
 
+    const visitor =
+        typeof getVisitorContext === "function"
+            ? getVisitorContext()
+            : {
+                  visitorId: extras.visitorId,
+                  respondentCode: extras.respondentCode,
+                  cohort: extras.cohort,
+                  metrikaClientId: extras.metrikaClientId
+              };
+
+    const cleanId = (value, max) =>
+        typeof sanitizeIdentityToken === "function"
+            ? sanitizeIdentityToken(value || "", max) || undefined
+            : value || undefined;
+
     data.sessions.push({
         id: Date.now(),
         topic,
@@ -38,6 +53,16 @@ function recordSession(topic, score, total, mode = null, extras = {}) {
         score: score == null ? undefined : score,
         total: total == null ? undefined : total,
         percent,
+        visitorId: cleanId(extras.visitorId || visitor.visitorId, 80),
+        respondentCode: cleanId(
+            extras.respondentCode || visitor.respondentCode,
+            64
+        ),
+        cohort: cleanId(extras.cohort || visitor.cohort, 40),
+        metrikaClientId: cleanId(
+            extras.metrikaClientId || visitor.metrikaClientId,
+            64
+        ),
         date: new Date().toISOString()
     });
     saveStats(data);
@@ -250,7 +275,11 @@ function exportProgressCsv() {
             "selectedLetter",
             "questionText",
             "selectedText",
-            "correctText"
+            "correctText",
+            "visitorId",
+            "respondentCode",
+            "cohort",
+            "metrikaClientId"
         ].join(",")
     ];
 
@@ -273,7 +302,11 @@ function exportProgressCsv() {
                 "",
                 "",
                 "",
-                ""
+                "",
+                s.visitorId || "",
+                s.respondentCode || "",
+                s.cohort || "",
+                s.metrikaClientId || ""
             ]
                 .map(csvEscape)
                 .join(",")
@@ -311,7 +344,11 @@ function exportProgressCsv() {
                 selectedLetter,
                 labels.questionText,
                 labels.selectedText,
-                labels.correctText
+                labels.correctText,
+                e.visitorId || "",
+                e.respondentCode || "",
+                e.cohort || "",
+                e.metrikaClientId || ""
             ]
                 .map(csvEscape)
                 .join(",")

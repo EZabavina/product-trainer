@@ -121,6 +121,13 @@ function resolveAnswerEventLabels(event) {
     };
 }
 
+function attachVisitorFields(event) {
+    if (typeof withVisitorContext === "function") {
+        return withVisitorContext(event);
+    }
+    return event;
+}
+
 /**
  * Записать исход одного ответа.
  * Всегда кладёт тексты вопроса / выбранного / верного ответа.
@@ -128,7 +135,7 @@ function resolveAnswerEventLabels(event) {
  */
 function recordAnswerOutcome(payload) {
     const labels = resolveAnswerEventLabels(payload || {});
-    const event = {
+    const event = attachVisitorFields({
         id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         type: "answer",
         questionId: payload.questionId,
@@ -147,7 +154,7 @@ function recordAnswerOutcome(payload) {
         total: typeof payload.total === "number" ? payload.total : null,
         percent: typeof payload.percent === "number" ? payload.percent : null,
         date: new Date().toISOString()
-    };
+    });
 
     if (!event.questionText || !event.correctText) {
         console.warn("[answers] missing texts for questionId", event.questionId, event);
@@ -172,7 +179,7 @@ function recordAnswerOutcome(payload) {
 }
 
 function recordSessionOutcome(payload) {
-    const event = {
+    const event = attachVisitorFields({
         id: `sess_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         type: "session",
         topic: payload.topic || null,
@@ -184,12 +191,21 @@ function recordSessionOutcome(payload) {
         total: payload.total ?? null,
         percent: payload.percent ?? null,
         date: new Date().toISOString()
-    };
+    });
 
-    const data = loadAnswerLog();
-    data.events.push(event);
-    saveAnswerLog(data);
-    sendAnalyticsEvent(event);
+    try {
+        sendAnalyticsEvent(event);
+    } catch (err) {
+        console.warn("sendAnalyticsEvent failed:", err);
+    }
+
+    try {
+        const data = loadAnswerLog();
+        data.events.push(event);
+        saveAnswerLog(data);
+    } catch (err) {
+        console.warn("saveAnswerLog failed:", err);
+    }
     return event;
 }
 
@@ -204,7 +220,7 @@ function recordLifecycleEvent(payload) {
     const type = payload.type;
     if (!LIFECYCLE_EVENT_TYPES.has(type)) return null;
 
-    const event = {
+    const event = attachVisitorFields({
         id: `lc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         type,
         route: payload.route || null,
@@ -224,16 +240,35 @@ function recordLifecycleEvent(payload) {
         total: payload.total ?? null,
         percent: payload.percent ?? null,
         date: new Date().toISOString()
-    };
+    });
 
-    const data = loadAnswerLog();
-    data.events.push(event);
-    saveAnswerLog(data);
-    sendAnalyticsEvent(event);
+    try {
+        sendAnalyticsEvent(event);
+    } catch (err) {
+        console.warn("sendAnalyticsEvent failed:", err);
+    }
+
+    try {
+        const data = loadAnswerLog();
+        data.events.push(event);
+        saveAnswerLog(data);
+    } catch (err) {
+        console.warn("saveAnswerLog failed:", err);
+    }
     return event;
 }
 
 function sendAnalyticsEvent(event) {
+    // Подтянуть Metrika clientID, если он появился после создания события
+    if (
+        event &&
+        !event.metrikaClientId &&
+        typeof getCachedMetrikaClientId === "function"
+    ) {
+        const mid = getCachedMetrikaClientId();
+        if (mid) event.metrikaClientId = mid;
+    }
+
     try {
         if (typeof trackMetrika === "function") {
             if (event.type === "answer") {
@@ -241,7 +276,11 @@ function sendAnalyticsEvent(event) {
                     question_id: event.questionId,
                     correct: event.correct ? 1 : 0,
                     topic: event.topic || "",
-                    quiz_type: event.quizType || ""
+                    quiz_type: event.quizType || "",
+                    visitor_id: event.visitorId || "",
+                    respondent: event.respondentCode || "",
+                    cohort: event.cohort || "",
+                    metrika_client_id: event.metrikaClientId || ""
                 });
             } else if (event.type === "session") {
                 trackMetrika("quiz_complete", {
@@ -249,7 +288,11 @@ function sendAnalyticsEvent(event) {
                     quiz_type: event.quizType || "",
                     percent: event.percent ?? 0,
                     score: event.score ?? 0,
-                    total: event.total ?? 0
+                    total: event.total ?? 0,
+                    visitor_id: event.visitorId || "",
+                    respondent: event.respondentCode || "",
+                    cohort: event.cohort || "",
+                    metrika_client_id: event.metrikaClientId || ""
                 });
             } else if (LIFECYCLE_EVENT_TYPES.has(event.type)) {
                 trackMetrika(event.type, {
@@ -266,7 +309,11 @@ function sendAnalyticsEvent(event) {
                     answered_count: event.answeredCount ?? "",
                     score: event.score ?? "",
                     total: event.total ?? "",
-                    percent: event.percent ?? ""
+                    percent: event.percent ?? "",
+                    visitor_id: event.visitorId || "",
+                    respondent: event.respondentCode || "",
+                    cohort: event.cohort || "",
+                    metrika_client_id: event.metrikaClientId || ""
                 });
             }
         }

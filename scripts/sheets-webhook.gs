@@ -1,15 +1,15 @@
 /**
  * Google Apps Script → лист "events".
  *
- * SCHEMA_VERSION = 4
+ * SCHEMA_VERSION = 5
  * Проверка, что стоит НОВЫЙ код: откройте URL /exec в браузере.
- * Должно быть: {"ok":true,"service":"product-trainer-sheets","schemaVersion":4}
- * Если schemaVersion нет — вы смотрите СТАРОЕ развёртывание. Сделайте Новую версию.
+ * Должно быть: {"ok":true,"service":"product-trainer-sheets","schemaVersion":5}
+ * Если schemaVersion нет / меньше — СТАРОЕ развёртывание. Сделайте Новую версию.
  *
  * Установка / обновление:
  * 1. Таблица → Расширения → Apps Script → замените ВЕСЬ код этим файлом.
  * 2. Сохранить.
- * 3. Выберите fixHeaders → Выполнить.
+ * 3. Выберите fixHeaders → Выполнить (добавит visitorId / respondentCode / cohort / metrikaClientId).
  * 4. Развернуть → Управление развёртываниями → карандаш → Новая версия → Развернуть.
  *    (просто «Сохранить» в редакторе НЕ обновляет /exec!)
  * 5. URL .../exec → Vercel env EVENTS_WEBHOOK_URL → Redeploy.
@@ -18,11 +18,12 @@
  */
 
 var SHEET_NAME = "events";
-var SCHEMA_VERSION = 4;
+var SCHEMA_VERSION = 5;
 
 /**
  * Канонический порядок колонок.
  * questionText / selectedText / correctText — ТЕКСТЫ, не topic/mode/quizType.
+ * visitorId / respondentCode / cohort / metrikaClientId — идентичность (v5).
  */
 var EVENT_HEADERS = [
   "receivedAt",
@@ -42,6 +43,10 @@ var EVENT_HEADERS = [
   "score",
   "total",
   "percent",
+  "visitorId",
+  "respondentCode",
+  "cohort",
+  "metrikaClientId",
   "source",
   "schemaVersion"
 ];
@@ -120,6 +125,26 @@ function looksLikeTopicInQuestionTextColumn(sheet) {
   return answers >= 1 && misaligned >= 1;
 }
 
+/**
+ * v4 → v5: после percent вставить visitorId, respondentCode, cohort, metrikaClientId.
+ * Вставляем ТОЛЬКО если сразу после percent идёт source (канон v4).
+ * Пустые ячейки не считаем сигналом — иначе возможен повторный insert.
+ * Сразу пишем канонические заголовки, чтобы headersMatch не падал.
+ */
+function ensureVisitorIdentityColumns(sheet, existing) {
+  var visitorIdx = headerIndex(existing, "visitorId");
+  var percentIdx = headerIndex(existing, "percent");
+  if (visitorIdx >= 0 || percentIdx < 0) return false;
+
+  var next = normalizeHeader(existing[percentIdx + 1]);
+  if (next !== "source") return false;
+
+  sheet.insertColumns(percentIdx + 2, 4);
+  headerRange(sheet, 1, EVENT_HEADERS.length).setValues([EVENT_HEADERS]);
+  clearExtraHeaderCells(sheet);
+  return true;
+}
+
 function ensureEventHeaders(sheet) {
   if (sheet.getLastRow() === 0 || sheet.getLastColumn() === 0) {
     headerRange(sheet, 1, EVENT_HEADERS.length).setValues([EVENT_HEADERS]);
@@ -130,6 +155,12 @@ function ensureEventHeaders(sheet) {
   var textIdx = headerIndex(existing, "questionText");
   var topicIdx = headerIndex(existing, "topic");
   var selectedIdx = headerIndex(existing, "selectedIndex");
+  var migratedIdentity = false;
+
+  if (ensureVisitorIdentityColumns(sheet, existing)) {
+    migratedIdentity = true;
+    existing = readHeaderRow(sheet);
+  }
 
   // Заголовки «как надо», но данные старого формата → сдвиг
   if (headersMatch(existing, EVENT_HEADERS) && looksLikeTopicInQuestionTextColumn(sheet)) {
@@ -141,7 +172,7 @@ function ensureEventHeaders(sheet) {
 
   if (headersMatch(existing, EVENT_HEADERS)) {
     clearExtraHeaderCells(sheet);
-    return { repaired: false, reason: "ok" };
+    return { repaired: migratedIdentity, reason: migratedIdentity ? "add-visitor-identity" : "ok" };
   }
 
   // topic сразу после selectedIndex (классическая старая схема)
@@ -153,9 +184,27 @@ function ensureEventHeaders(sheet) {
     sheet.insertColumns(at, 3);
   }
 
+  // После сдвига текстовых колонок — identity, если percent→source
+  existing = readHeaderRow(sheet);
+  if (ensureVisitorIdentityColumns(sheet, existing)) {
+    migratedIdentity = true;
+    existing = readHeaderRow(sheet);
+  }
+
+  if (headersMatch(existing, EVENT_HEADERS)) {
+    clearExtraHeaderCells(sheet);
+    return {
+      repaired: true,
+      reason: migratedIdentity ? "normalize-headers+visitor-identity" : "normalize-headers"
+    };
+  }
+
   headerRange(sheet, 1, EVENT_HEADERS.length).setValues([EVENT_HEADERS]);
   clearExtraHeaderCells(sheet);
-  return { repaired: true, reason: "normalize-headers" };
+  return {
+    repaired: true,
+    reason: migratedIdentity ? "normalize-headers+visitor-identity" : "normalize-headers"
+  };
 }
 
 function buildEventRow(event, source) {
@@ -177,6 +226,10 @@ function buildEventRow(event, source) {
     event.score != null ? event.score : "",
     event.total != null ? event.total : "",
     event.percent != null ? event.percent : "",
+    event.visitorId || "",
+    event.respondentCode || "",
+    event.cohort || "",
+    event.metrikaClientId || "",
     source || "product-trainer",
     SCHEMA_VERSION
   ];

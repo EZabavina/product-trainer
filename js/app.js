@@ -2477,5 +2477,12 @@ window.addEventListener("pagehide", () => {
     }
 });
 
+if (typeof captureRespondentFromUrl === "function") {
+    captureRespondentFromUrl();
+}
+if (typeof requestMetrikaClientId === "function") {
+    requestMetrikaClientId();
+}
+
 applyCurrentRoute({ replace: true });
 maybeShowOnboarding();

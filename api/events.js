@@ -69,6 +69,16 @@ export default async function handler(req, res) {
             return s.slice(0, max);
         };
 
+        /** Как sanitizeIdentityToken на клиенте: длина + безопасный алфавит. */
+        const identityOrNull = (value, max) => {
+            if (value == null) return null;
+            const s = String(value)
+                .trim()
+                .slice(0, max)
+                .replace(/[^\w.@+=\-а-яА-ЯёЁ]/giu, "");
+            return s || null;
+        };
+
         let sanitized = {
             type: event.type,
             questionId: event.questionId ?? null,
@@ -85,6 +95,10 @@ export default async function handler(req, res) {
             score: typeof event.score === "number" ? event.score : null,
             total: typeof event.total === "number" ? event.total : null,
             percent: typeof event.percent === "number" ? event.percent : null,
+            visitorId: identityOrNull(event.visitorId, 80),
+            respondentCode: identityOrNull(event.respondentCode, 64),
+            cohort: identityOrNull(event.cohort, 40),
+            metrikaClientId: identityOrNull(event.metrikaClientId, 64),
             route: textOrNull(event.route, 120),
             formatSlug: textOrNull(event.formatSlug, 40),
             topicSlug: textOrNull(event.topicSlug, 40),

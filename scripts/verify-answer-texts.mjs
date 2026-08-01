@@ -31,6 +31,10 @@ const EVENT_HEADERS = [
     "score",
     "total",
     "percent",
+    "visitorId",
+    "respondentCode",
+    "cohort",
+    "metrikaClientId",
     "source",
     "schemaVersion"
 ];
@@ -54,8 +58,12 @@ function buildEventRow(headers, event, source) {
         score: event.score != null ? event.score : "",
         total: event.total != null ? event.total : "",
         percent: event.percent != null ? event.percent : "",
+        visitorId: event.visitorId || "",
+        respondentCode: event.respondentCode || "",
+        cohort: event.cohort || "",
+        metrikaClientId: event.metrikaClientId || "",
         source: source || "product-trainer",
-        schemaVersion: 4
+        schemaVersion: 5
     };
     return headers.map((name) =>
         Object.prototype.hasOwnProperty.call(values, name) ? values[name] : ""
