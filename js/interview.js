@@ -219,6 +219,15 @@ async function endInterview() {
             if (!savedOk) interviewDebriefReplayHint.classList.add("is-error");
             else interviewDebriefReplayHint.classList.remove("is-error");
         }
+
+        // Success: разбор получен (даже если локальный сейв упал)
+        if (typeof trackMetrika === "function") {
+            trackMetrika("interview_complete", {
+                scenario: currentScenario.id || "",
+                user_turns: userTurns,
+                saved: savedOk ? 1 : 0
+            });
+        }
     } catch (err) {
         setInterviewLoading(false);
         interviewStatus.textContent = err.message;
