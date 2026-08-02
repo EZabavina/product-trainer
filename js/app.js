@@ -2269,7 +2269,7 @@ if (btnExportCsv) {
 }
 
 /* ——— Онбординг ——— */
-const ONBOARDING_KEY = "product-trainer-onboarding-v2";
+const ONBOARDING_KEY = "product-trainer-onboarding-v3";
 const onboardingEl = document.getElementById("onboarding");
 const onboardingCard = onboardingEl?.querySelector(".onboarding-card") || null;
 const onboardingBackdrop = document.getElementById("onboarding-backdrop");
@@ -2278,6 +2278,7 @@ const onboardingStepLabel = document.getElementById("onboarding-step-label");
 const onboardingIcon = document.getElementById("onboarding-icon");
 const onboardingTitle = document.getElementById("onboarding-title");
 const onboardingText = document.getElementById("onboarding-text");
+const onboardingBullets = document.getElementById("onboarding-bullets");
 const onboardingDots = document.getElementById("onboarding-dots");
 const onboardingSkip = document.getElementById("onboarding-skip");
 const onboardingBack = document.getElementById("onboarding-back");
@@ -2287,19 +2288,25 @@ const btnHowTo = document.getElementById("btn-how-to");
 
 const ONBOARDING_STEPS = [
     {
-        icon: "📚",
-        title: "База знаний",
-        text: "Это шпаргалки по темам: формулы, определения и подборка материалов. Откройте вкладку «База знаний», чтобы быстро освежить тему перед тренировкой или разобрать ошибку после ответа."
+        icon: "👋",
+        title: "Добро пожаловать в тренажёр продакта",
+        text: "Здесь тренируют продуктовые навыки: метрики, юнит-экономику, JTBD, CustDev и финансы. Отвечаешь на вопросы и кейсы — как мини-экзамен, но с разбором."
     },
     {
-        icon: "🎯",
-        title: "Темы и типы тренировок",
-        text: "Сначала выберите тему (Метрики, JTBD, CustDev и др.), затем тип: определения, кейсы, расчёты, лаб или симулятор интервью. Длину раунда можно взять короткой или стандартной."
+        icon: "🧭",
+        title: "Что внутри",
+        text: "Старт — с вкладки «Тренировка». Внутри:",
+        bullets: [
+            "тренировки по темам",
+            "база знаний (шпаргалки)",
+            "симулятор CustDev-интервью (чат с ИИ)",
+            "разбор ошибок"
+        ]
     },
     {
         icon: "📈",
-        title: "Что в статистике",
-        text: "Уровень и таблица скилов, сложные вопросы, прогресс по темам и история раундов. Всё хранится в этом браузере — можно вернуться и продолжить с того же места."
+        title: "Зачем смотреть статистику",
+        text: "Не только «сколько прошёл», а где стабильно ошибаетесь. Уровень и скиллы подскажут, что качать дальше."
     }
 ];
 
@@ -2352,6 +2359,19 @@ function renderOnboardingStep() {
     if (onboardingTitle) onboardingTitle.textContent = step.title;
     if (onboardingText) onboardingText.textContent = step.text;
 
+    if (onboardingBullets) {
+        const bullets = Array.isArray(step.bullets) ? step.bullets : [];
+        if (bullets.length) {
+            onboardingBullets.innerHTML = bullets
+                .map((item) => `<li>${escapeHtml(String(item))}</li>`)
+                .join("");
+            onboardingBullets.classList.remove("hidden");
+        } else {
+            onboardingBullets.innerHTML = "";
+            onboardingBullets.classList.add("hidden");
+        }
+    }
+
     if (onboardingDots) {
         onboardingDots.innerHTML = ONBOARDING_STEPS.map(
             (_, i) =>
@@ -2363,7 +2383,7 @@ function renderOnboardingStep() {
         onboardingBack.classList.toggle("hidden", onboardingStep === 0);
     }
     if (onboardingNext) {
-        onboardingNext.textContent = isLast ? "Начать с Метрик" : "Далее";
+        onboardingNext.textContent = isLast ? "Понятно" : "Далее";
     }
 }
 
@@ -2475,7 +2495,7 @@ onboardingNext?.addEventListener("click", () => {
     if (typeof trackMetrika === "function") {
         trackMetrika("onboarding_complete");
     }
-    startQuickStart({ fromOnboarding: true });
+    closeOnboarding({ markDone: true, reason: "complete", track: false });
 });
 
 onboardingBack?.addEventListener("click", () => {

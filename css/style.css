@@ -667,10 +667,28 @@ body::before {
 
 .onboarding-text {
     margin: 0 auto 18px;
-    max-width: 34ch;
+    max-width: 38ch;
     font-size: 0.95rem;
     line-height: 1.5;
     color: var(--text-muted);
+}
+
+.onboarding-bullets {
+    margin: -6px auto 18px;
+    padding: 0 0 0 1.15em;
+    max-width: 38ch;
+    text-align: left;
+    font-size: 0.95rem;
+    line-height: 1.45;
+    color: var(--text-muted);
+}
+
+.onboarding-bullets li {
+    margin: 0 0 0.45em;
+}
+
+.onboarding-bullets li:last-child {
+    margin-bottom: 0;
 }
 
 .onboarding-dots {
